@@ -1480,6 +1480,28 @@ function ensureCartPanel() {
     },
     true,
   );
+
+  panel.addEventListener(
+    "touchstart",
+    (event) => {
+      if (getExploreButton(event.target)) {
+        event.preventDefault();
+        handleExplore(event);
+      }
+    },
+    { capture: true, passive: false },
+  );
+
+  panel.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.pointerType === "touch" && getExploreButton(event.target)) {
+        event.preventDefault();
+        handleExplore(event);
+      }
+    },
+    true,
+  );
   const clearBtn = panel.querySelector(".cart-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {

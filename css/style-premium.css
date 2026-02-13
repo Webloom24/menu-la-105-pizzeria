@@ -339,6 +339,9 @@ body.cart-open {
 .cart-explore {
   background: #efe8d6;
   color: var(--forest);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .cart-clear {
