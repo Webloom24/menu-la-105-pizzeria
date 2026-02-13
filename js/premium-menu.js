@@ -1430,19 +1430,31 @@ function ensureCartPanel() {
   document.body.appendChild(panel);
 
   const exploreBtn = panel.querySelector(".cart-explore");
-  if (exploreBtn && !exploreBtn.querySelector(".cart-btn-text-wrapper")) {
-    const label = exploreBtn.textContent || "";
-    exploreBtn.textContent = "";
-    const textWrapper = document.createElement("span");
-    textWrapper.className = "cart-btn-text-wrapper";
-    textWrapper.textContent = label.trim();
-    exploreBtn.appendChild(textWrapper);
-  }
-  if (exploreBtn && !exploreBtn.querySelector(".cart-btn-overlay")) {
-    const overlay = document.createElement("span");
-    overlay.className = "cart-btn-overlay";
-    overlay.setAttribute("aria-hidden", "true");
-    exploreBtn.appendChild(overlay);
+  let tapOverlay = null;
+  if (exploreBtn) {
+    if (getComputedStyle(exploreBtn).position === "static") {
+      exploreBtn.style.position = "relative";
+    }
+    tapOverlay = exploreBtn.querySelector('[data-tap-overlay="true"]');
+    if (!tapOverlay) {
+      tapOverlay = document.createElement("div");
+      tapOverlay.setAttribute("data-tap-overlay", "true");
+      tapOverlay.setAttribute("aria-hidden", "true");
+      tapOverlay.style.cssText =
+        "position:absolute !important;inset:0 !important;z-index:999999 !important;" +
+        "background:transparent !important;cursor:pointer !important;";
+      exploreBtn.appendChild(tapOverlay);
+    }
+
+    const children = Array.from(exploreBtn.children).filter(
+      (el) => !el.hasAttribute("data-tap-overlay"),
+    );
+    children.forEach((child) => {
+      child.style.pointerEvents = "none";
+      child.style.userSelect = "none";
+      child.style.webkitUserSelect = "none";
+      child.style.webkitTouchCallout = "none";
+    });
   }
 
   overlay.addEventListener("click", closeCart);
@@ -1456,106 +1468,58 @@ function ensureCartPanel() {
       openOrderModal();
     });
   }
-  let lastExploreTrigger = 0;
-  const handleExplore = (event) => {
-    const now = Date.now();
-    if (now - lastExploreTrigger < 350) return;
-    lastExploreTrigger = now;
-    event.preventDefault();
-    event.stopPropagation();
+  let ejecutando = false;
+  const handleExplore = () => {
+    if (ejecutando) return;
+    ejecutando = true;
     seguirExplorando();
+    setTimeout(() => {
+      ejecutando = false;
+    }, 300);
   };
 
-  const getExploreButton = (eventTarget) => {
-    if (!eventTarget) return null;
-    if (eventTarget.closest) {
-      return eventTarget.closest(".cart-explore");
-    }
-    if (eventTarget.parentElement && eventTarget.parentElement.closest) {
-      return eventTarget.parentElement.closest(".cart-explore");
-    }
-    return null;
-  };
-
-  panel.addEventListener(
-    "click",
-    (event) => {
-      if (getExploreButton(event.target)) {
-        handleExplore(event);
-      }
-    },
-    true,
-  );
-
-  panel.addEventListener(
-    "touchend",
-    (event) => {
-      if (getExploreButton(event.target)) {
-        handleExplore(event);
-      }
-    },
-    true,
-  );
-
-  panel.addEventListener(
-    "contextmenu",
-    (event) => {
-      if (getExploreButton(event.target)) {
+  if (tapOverlay) {
+    tapOverlay.addEventListener(
+      "contextmenu",
+      (event) => {
         event.preventDefault();
         event.stopPropagation();
-      }
-    },
-    true,
-  );
-
-  panel.addEventListener(
-    "selectstart",
-    (event) => {
-      if (getExploreButton(event.target)) {
+      },
+      { capture: true, passive: false },
+    );
+    tapOverlay.addEventListener(
+      "selectstart",
+      (event) => {
         event.preventDefault();
-      }
-    },
-    true,
-  );
-
-  panel.addEventListener(
-    "touchstart",
-    (event) => {
-      if (getExploreButton(event.target)) {
+      },
+      { capture: true, passive: false },
+    );
+    tapOverlay.addEventListener(
+      "touchstart",
+      (event) => {
         event.preventDefault();
-        handleExplore(event);
-      }
-    },
-    { capture: true, passive: false },
-  );
-
-  panel.addEventListener(
-    "pointerdown",
-    (event) => {
-      if (event.pointerType === "touch" && getExploreButton(event.target)) {
+        event.stopPropagation();
+      },
+      { capture: true, passive: false },
+    );
+    tapOverlay.addEventListener(
+      "touchend",
+      (event) => {
         event.preventDefault();
-        handleExplore(event);
-      }
-    },
-    true,
-  );
-
-  const exploreOverlay = exploreBtn
-    ? exploreBtn.querySelector(".cart-btn-overlay")
-    : null;
-  if (exploreOverlay) {
-    const handleOverlay = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      handleExplore(event);
-    };
-    exploreOverlay.addEventListener("touchstart", handleOverlay, {
-      passive: false,
-    });
-    exploreOverlay.addEventListener("touchend", handleOverlay, {
-      passive: false,
-    });
-    exploreOverlay.addEventListener("click", handleOverlay);
+        event.stopPropagation();
+        handleExplore();
+      },
+      { capture: true, passive: false },
+    );
+    tapOverlay.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleExplore();
+      },
+      { capture: true },
+    );
   }
   const clearBtn = panel.querySelector(".cart-clear");
   if (clearBtn) {
