@@ -1438,11 +1438,11 @@ function ensureCartPanel() {
 
     let labelWrapper = exploreBtn.querySelector(".cart-btn-text-wrapper");
     if (!labelWrapper) {
-      const texto = (exploreBtn.textContent || "").trim();
+      const label = (exploreBtn.textContent || "").trim();
       exploreBtn.textContent = "";
       labelWrapper = document.createElement("span");
       labelWrapper.className = "cart-btn-text-wrapper";
-      labelWrapper.textContent = texto;
+      labelWrapper.textContent = label;
       exploreBtn.appendChild(labelWrapper);
     }
 
@@ -1460,10 +1460,10 @@ function ensureCartPanel() {
       exploreBtn.appendChild(tapOverlay);
     }
 
+    exploreBtn.style.touchAction = "manipulation";
     exploreBtn.style.webkitUserSelect = "none";
     exploreBtn.style.userSelect = "none";
     exploreBtn.style.webkitTouchCallout = "none";
-    exploreBtn.style.touchAction = "manipulation";
 
     Array.from(exploreBtn.children).forEach((child) => {
       if (child === tapOverlay) return;
@@ -1476,9 +1476,8 @@ function ensureCartPanel() {
 
   overlay.addEventListener("click", closeCart);
   const closeBtn = panel.querySelector(".cart-close");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", closeCart);
-  }
+  if (closeBtn) closeBtn.addEventListener("click", closeCart);
+
   const whatsappBtn = panel.querySelector(".cart-whatsapp");
   if (whatsappBtn) {
     whatsappBtn.addEventListener("click", () => {
@@ -1486,79 +1485,94 @@ function ensureCartPanel() {
     });
   }
 
-  let bloqueoExplorar = false;
-  const activarExplorar = () => {
-    if (bloqueoExplorar) return;
-    bloqueoExplorar = true;
+  let exploring = false;
+  const triggerExplore = () => {
+    if (exploring) return;
+    exploring = true;
     seguirExplorando();
     setTimeout(() => {
-      bloqueoExplorar = false;
+      exploring = false;
     }, 300);
   };
 
   if (tapOverlay) {
-    const detenerEvento = (event, ejecutar = false) => {
+    const trapEvent = (event, run = false) => {
       event.preventDefault();
       event.stopPropagation();
-      if (ejecutar) activarExplorar();
+      if (run) triggerExplore();
       return false;
     };
 
-    tapOverlay.addEventListener(
-      "contextmenu",
-      (event) => detenerEvento(event),
-      { capture: true, passive: false },
-    );
-    tapOverlay.addEventListener(
-      "selectstart",
-      (event) => detenerEvento(event),
-      { capture: true, passive: false },
-    );
-    tapOverlay.addEventListener("touchstart", (event) => detenerEvento(event), {
+    tapOverlay.addEventListener("contextmenu", (event) => trapEvent(event), {
+      capture: true,
+      passive: false,
+    });
+    tapOverlay.addEventListener("selectstart", (event) => trapEvent(event), {
       capture: true,
       passive: false,
     });
     tapOverlay.addEventListener(
+      "touchstart",
+      (event) => trapEvent(event, true),
+      { capture: true, passive: false },
+    );
+    tapOverlay.addEventListener(
       "pointerdown",
-      (event) => detenerEvento(event),
+      (event) => trapEvent(event, true),
       { capture: true },
     );
     tapOverlay.addEventListener(
       "touchend",
-      (event) => detenerEvento(event, true),
+      (event) => trapEvent(event, false),
       { capture: true, passive: false },
     );
     tapOverlay.addEventListener(
       "pointerup",
-      (event) => detenerEvento(event, true),
+      (event) => trapEvent(event, false),
       { capture: true },
     );
-    tapOverlay.addEventListener(
-      "click",
-      (event) => detenerEvento(event, true),
-      { capture: true },
-    );
+    tapOverlay.addEventListener("click", (event) => trapEvent(event, true), {
+      capture: true,
+    });
   }
 
   if (exploreBtn) {
-    const manejarClickBoton = (event) => {
+    const handleButtonTap = (event, run = true) => {
       event.preventDefault();
       event.stopPropagation();
-      activarExplorar();
+      if (run) triggerExplore();
     };
-    exploreBtn.addEventListener("click", manejarClickBoton, true);
-    exploreBtn.addEventListener("touchend", manejarClickBoton, {
-      capture: true,
-      passive: false,
-    });
-    exploreBtn.addEventListener("pointerup", manejarClickBoton, {
-      capture: true,
-    });
+
+    exploreBtn.addEventListener(
+      "touchstart",
+      (event) => handleButtonTap(event, true),
+      { capture: true, passive: false },
+    );
+    exploreBtn.addEventListener(
+      "pointerdown",
+      (event) => handleButtonTap(event, true),
+      { capture: true },
+    );
+    exploreBtn.addEventListener(
+      "touchend",
+      (event) => handleButtonTap(event, false),
+      { capture: true, passive: false },
+    );
+    exploreBtn.addEventListener(
+      "pointerup",
+      (event) => handleButtonTap(event, false),
+      { capture: true },
+    );
+    exploreBtn.addEventListener(
+      "click",
+      (event) => handleButtonTap(event, true),
+      true,
+    );
     exploreBtn.addEventListener(
       "keydown",
       (event) => {
         if (event.key === "Enter" || event.key === " ") {
-          manejarClickBoton(event);
+          handleButtonTap(event, true);
         }
       },
       true,
@@ -1578,13 +1592,10 @@ function ensureCartPanel() {
       const button = event.target.closest(".cart-item-remove");
       if (!button) return;
       const id = Number(button.dataset.itemId);
-      if (!Number.isNaN(id)) {
-        removeCartItem(id);
-      }
+      if (!Number.isNaN(id)) removeCartItem(id);
     });
   }
 
-  // Usar listener delegado para ESC solo una vez
   if (!document.__cartEscListenerAdded) {
     document.addEventListener("keydown", (event) => {
       const cartPanel = document.getElementById("cart-panel");
@@ -1670,7 +1681,7 @@ function updateCartUI() {
 function openCart() {
   const panel = document.getElementById("cart-panel");
   const overlay = document.getElementById("cart-overlay");
-  if (!panel || !overlay) return;
+  overlay.id = "cart-overlay";
   overlay.style.display = "block";
   overlay.style.pointerEvents = "auto";
   panel.classList.add("active");
