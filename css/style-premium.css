@@ -310,7 +310,7 @@ body.cart-open {
 }
 
 .cart-btn * {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .cart-btn:disabled {
