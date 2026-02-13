@@ -339,17 +339,26 @@ body.cart-open {
 .cart-explore {
   background: #efe8d6;
   color: var(--forest);
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 .cart-btn-text-wrapper {
   pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
   display: block;
+}
+
+.cart-btn-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: transparent;
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .cart-clear {

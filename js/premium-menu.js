@@ -1438,6 +1438,12 @@ function ensureCartPanel() {
     textWrapper.textContent = label.trim();
     exploreBtn.appendChild(textWrapper);
   }
+  if (exploreBtn && !exploreBtn.querySelector(".cart-btn-overlay")) {
+    const overlay = document.createElement("span");
+    overlay.className = "cart-btn-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    exploreBtn.appendChild(overlay);
+  }
 
   overlay.addEventListener("click", closeCart);
   const closeBtn = panel.querySelector(".cart-close");
@@ -1533,6 +1539,24 @@ function ensureCartPanel() {
     },
     true,
   );
+
+  const exploreOverlay = exploreBtn
+    ? exploreBtn.querySelector(".cart-btn-overlay")
+    : null;
+  if (exploreOverlay) {
+    const handleOverlay = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      handleExplore(event);
+    };
+    exploreOverlay.addEventListener("touchstart", handleOverlay, {
+      passive: false,
+    });
+    exploreOverlay.addEventListener("touchend", handleOverlay, {
+      passive: false,
+    });
+    exploreOverlay.addEventListener("click", handleOverlay);
+  }
   const clearBtn = panel.querySelector(".cart-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
