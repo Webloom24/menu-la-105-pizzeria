@@ -1442,9 +1442,16 @@ function ensureCartPanel() {
       tapOverlay.setAttribute("aria-hidden", "true");
       tapOverlay.style.cssText =
         "position:absolute !important;inset:0 !important;z-index:999999 !important;" +
-        "background:transparent !important;cursor:pointer !important;";
+        "background:transparent !important;cursor:pointer !important;" +
+        "pointer-events:auto !important;touch-action:none !important;" +
+        "-webkit-user-select:none !important;user-select:none !important;" +
+        "-webkit-touch-callout:none !important;";
       exploreBtn.appendChild(tapOverlay);
     }
+
+    exploreBtn.style.webkitUserSelect = "none";
+    exploreBtn.style.userSelect = "none";
+    exploreBtn.style.webkitTouchCallout = "none";
 
     const children = Array.from(exploreBtn.children).filter(
       (el) => !el.hasAttribute("data-tap-overlay"),
@@ -1503,6 +1510,14 @@ function ensureCartPanel() {
       { capture: true, passive: false },
     );
     tapOverlay.addEventListener(
+      "pointerdown",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      { capture: true },
+    );
+    tapOverlay.addEventListener(
       "touchend",
       (event) => {
         event.preventDefault();
@@ -1510,6 +1525,15 @@ function ensureCartPanel() {
         handleExplore();
       },
       { capture: true, passive: false },
+    );
+    tapOverlay.addEventListener(
+      "pointerup",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleExplore();
+      },
+      { capture: true },
     );
     tapOverlay.addEventListener(
       "click",
