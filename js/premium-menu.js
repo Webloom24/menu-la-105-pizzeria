@@ -1435,6 +1435,17 @@ function ensureCartPanel() {
     if (getComputedStyle(exploreBtn).position === "static") {
       exploreBtn.style.position = "relative";
     }
+
+    let labelWrapper = exploreBtn.querySelector(".cart-btn-text-wrapper");
+    if (!labelWrapper) {
+      const texto = (exploreBtn.textContent || "").trim();
+      exploreBtn.textContent = "";
+      labelWrapper = document.createElement("span");
+      labelWrapper.className = "cart-btn-text-wrapper";
+      labelWrapper.textContent = texto;
+      exploreBtn.appendChild(labelWrapper);
+    }
+
     tapOverlay = exploreBtn.querySelector('[data-tap-overlay="true"]');
     if (!tapOverlay) {
       tapOverlay = document.createElement("div");
@@ -1452,11 +1463,10 @@ function ensureCartPanel() {
     exploreBtn.style.webkitUserSelect = "none";
     exploreBtn.style.userSelect = "none";
     exploreBtn.style.webkitTouchCallout = "none";
+    exploreBtn.style.touchAction = "manipulation";
 
-    const children = Array.from(exploreBtn.children).filter(
-      (el) => !el.hasAttribute("data-tap-overlay"),
-    );
-    children.forEach((child) => {
+    Array.from(exploreBtn.children).forEach((child) => {
+      if (child === tapOverlay) return;
       child.style.pointerEvents = "none";
       child.style.userSelect = "none";
       child.style.webkitUserSelect = "none";
@@ -1475,76 +1485,86 @@ function ensureCartPanel() {
       openOrderModal();
     });
   }
-  let ejecutando = false;
-  const handleExplore = () => {
-    if (ejecutando) return;
-    ejecutando = true;
+
+  let bloqueoExplorar = false;
+  const activarExplorar = () => {
+    if (bloqueoExplorar) return;
+    bloqueoExplorar = true;
     seguirExplorando();
     setTimeout(() => {
-      ejecutando = false;
+      bloqueoExplorar = false;
     }, 300);
   };
 
   if (tapOverlay) {
+    const detenerEvento = (event, ejecutar = false) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (ejecutar) activarExplorar();
+      return false;
+    };
+
     tapOverlay.addEventListener(
       "contextmenu",
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      },
+      (event) => detenerEvento(event),
       { capture: true, passive: false },
     );
     tapOverlay.addEventListener(
       "selectstart",
-      (event) => {
-        event.preventDefault();
-      },
+      (event) => detenerEvento(event),
       { capture: true, passive: false },
     );
-    tapOverlay.addEventListener(
-      "touchstart",
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      },
-      { capture: true, passive: false },
-    );
+    tapOverlay.addEventListener("touchstart", (event) => detenerEvento(event), {
+      capture: true,
+      passive: false,
+    });
     tapOverlay.addEventListener(
       "pointerdown",
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-      },
+      (event) => detenerEvento(event),
       { capture: true },
     );
     tapOverlay.addEventListener(
       "touchend",
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        handleExplore();
-      },
+      (event) => detenerEvento(event, true),
       { capture: true, passive: false },
     );
     tapOverlay.addEventListener(
       "pointerup",
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        handleExplore();
-      },
+      (event) => detenerEvento(event, true),
       { capture: true },
     );
     tapOverlay.addEventListener(
       "click",
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        handleExplore();
-      },
+      (event) => detenerEvento(event, true),
       { capture: true },
     );
   }
+
+  if (exploreBtn) {
+    const manejarClickBoton = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      activarExplorar();
+    };
+    exploreBtn.addEventListener("click", manejarClickBoton, true);
+    exploreBtn.addEventListener("touchend", manejarClickBoton, {
+      capture: true,
+      passive: false,
+    });
+    exploreBtn.addEventListener("pointerup", manejarClickBoton, {
+      capture: true,
+    });
+    exploreBtn.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          manejarClickBoton(event);
+        }
+      },
+      true,
+    );
+  }
+
   const clearBtn = panel.querySelector(".cart-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
