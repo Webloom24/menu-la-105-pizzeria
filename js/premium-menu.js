@@ -1481,65 +1481,34 @@ function ensureCartPanel() {
 
   if (exploreBtn) {
     let lastTrigger = 0;
-    const runOnce = () => {
+    const tryTriggerExplore = () => {
       const now = Date.now();
-      if (now - lastTrigger < 120) return;
+      if (now - lastTrigger < 100) return;
       lastTrigger = now;
       triggerExplore();
     };
 
-    const handlePointerEvent = (event) => {
-      if (event.pointerType === "mouse" && event.type === "pointerdown") {
-        return;
+    const handleActivate = (event) => {
+      if (event.type === "keydown") {
+        const key = event.key;
+        if (key !== "Enter" && key !== " ") return;
       }
-      event.preventDefault();
-      event.stopPropagation();
-      runOnce();
-    };
-
-    const handleTouchEvent = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      runOnce();
-    };
-
-    const pointerSupported = "PointerEvent" in window;
-    if (pointerSupported) {
-      ["pointerdown", "pointerup"].forEach((type) => {
-        exploreBtn.addEventListener(type, handlePointerEvent, {
-          capture: true,
-          passive: false,
-        });
-      });
-    } else {
-      ["touchstart", "touchend"].forEach((type) => {
-        exploreBtn.addEventListener(type, handleTouchEvent, {
-          capture: true,
-          passive: false,
-        });
-      });
-    }
-
-    exploreBtn.addEventListener(
-      "click",
-      (event) => {
+      if (event.cancelable) {
         event.preventDefault();
-        event.stopPropagation();
-        runOnce();
-      },
-      true,
-    );
+      }
+      event.stopPropagation();
+      tryTriggerExplore();
+    };
 
-    exploreBtn.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          runOnce();
-        }
-      },
-      true,
-    );
+    const activationEvents = ["pointerup", "touchend", "click"];
+    activationEvents.forEach((type) => {
+      exploreBtn.addEventListener(type, handleActivate, {
+        capture: true,
+        passive: false,
+      });
+    });
+
+    exploreBtn.addEventListener("keydown", handleActivate, true);
   }
 
   const clearBtn = panel.querySelector(".cart-clear");
