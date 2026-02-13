@@ -1483,38 +1483,50 @@ function ensureCartPanel() {
     let lastTrigger = 0;
     const runOnce = () => {
       const now = Date.now();
-      if (now - lastTrigger < 180) return;
+      if (now - lastTrigger < 120) return;
       lastTrigger = now;
       triggerExplore();
     };
 
-    const handleButtonTap = (event) => {
-      if (event.type === "pointerup" && event.pointerType === "mouse") {
+    const handlePointerEvent = (event) => {
+      if (event.pointerType === "mouse" && event.type === "pointerdown") {
         return;
       }
-      if (event.type !== "click") {
-        event.preventDefault();
-      }
+      event.preventDefault();
+      event.stopPropagation();
+      runOnce();
+    };
+
+    const handleTouchEvent = (event) => {
+      event.preventDefault();
       event.stopPropagation();
       runOnce();
     };
 
     const pointerSupported = "PointerEvent" in window;
     if (pointerSupported) {
-      exploreBtn.addEventListener("pointerup", handleButtonTap, {
-        capture: true,
-        passive: false,
+      ["pointerdown", "pointerup"].forEach((type) => {
+        exploreBtn.addEventListener(type, handlePointerEvent, {
+          capture: true,
+          passive: false,
+        });
       });
     } else {
-      exploreBtn.addEventListener("touchend", handleButtonTap, {
-        capture: true,
-        passive: false,
+      ["touchstart", "touchend"].forEach((type) => {
+        exploreBtn.addEventListener(type, handleTouchEvent, {
+          capture: true,
+          passive: false,
+        });
       });
     }
 
     exploreBtn.addEventListener(
       "click",
-      (event) => handleButtonTap(event),
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        runOnce();
+      },
       true,
     );
 
