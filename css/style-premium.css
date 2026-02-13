@@ -308,11 +308,17 @@ body.cart-open {
   z-index: 2;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   pointer-events: auto;
 }
 
 .cart-btn * {
+  pointer-events: none;
+}
+
+.cart-btn::before,
+.cart-btn::after {
   pointer-events: none;
 }
 

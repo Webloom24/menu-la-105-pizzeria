@@ -1440,20 +1440,35 @@ function ensureCartPanel() {
       openOrderModal();
     });
   }
-  const exploreBtn = panel.querySelector(".cart-explore");
-  if (exploreBtn) {
-    let lastExploreTrigger = 0;
-    const handleExplore = (event) => {
-      const now = Date.now();
-      if (now - lastExploreTrigger < 350) return;
-      lastExploreTrigger = now;
-      event.preventDefault();
-      event.stopPropagation();
-      seguirExplorando();
-    };
-    exploreBtn.addEventListener("pointerup", handleExplore);
-    exploreBtn.addEventListener("click", handleExplore);
-  }
+  let lastExploreTrigger = 0;
+  const handleExplore = (event) => {
+    const now = Date.now();
+    if (now - lastExploreTrigger < 350) return;
+    lastExploreTrigger = now;
+    event.preventDefault();
+    event.stopPropagation();
+    seguirExplorando();
+  };
+
+  panel.addEventListener(
+    "click",
+    (event) => {
+      if (event.target.closest(".cart-explore")) {
+        handleExplore(event);
+      }
+    },
+    true,
+  );
+
+  panel.addEventListener(
+    "touchend",
+    (event) => {
+      if (event.target.closest(".cart-explore")) {
+        handleExplore(event);
+      }
+    },
+    true,
+  );
   const clearBtn = panel.querySelector(".cart-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
