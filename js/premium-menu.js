@@ -1500,7 +1500,13 @@ function ensureCartPanel() {
       tryTriggerExplore();
     };
 
-    const activationEvents = ["pointerup", "touchend", "click"];
+    const activationEvents = [
+      "pointerdown",
+      "pointerup",
+      "touchstart",
+      "touchend",
+      "click",
+    ];
     activationEvents.forEach((type) => {
       exploreBtn.addEventListener(type, handleActivate, {
         capture: true,
