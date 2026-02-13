@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1b4332" />
+    <meta http-equiv="Cache-Control" content="public, max-age=31536000" />
+    <title>Promo - Pizzeria La 105</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&family=Sora:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="preload" href="../css/style-premium.css" as="style" />
+    <link rel="preload" href="../js/premium-menu.js" as="script" />
+
+    <link rel="stylesheet" href="../css/style-premium.css" />
+    <script src="../js/premium-menu.js" defer></script>
+  </head>
+  <body data-page="promo" class="page">
+    <header class="app-header">
+      <img
+        class="app-logo"
+        src="../images/logo.webp"
+        alt="Pizzeria La 105"
+        width="120"
+        height="120"
+        loading="eager"
+      />
+      <a class="cart-fab" href="#" aria-label="Carrito">🛒</a>
+    </header>
+
+    <main class="app-main">
+      <section class="page-title">
+        <h1>Promo de la semana</h1>
+        <p>Disponible de lunes a viernes.</p>
+      </section>
+
+      <section class="promo-hero">
+        <div class="promo-hero-media">
+          <img
+            src="../images/imagen-promo.webp"
+            alt="Pizzeta con queso y gaseosa para la promo"
+            width="920"
+            height="690"
+            loading="eager"
+          />
+          <span class="promo-hero-badge">Combo irresistible</span>
+        </div>
+        <div class="promo-hero-copy">
+          <h2>Queso derretido + gaseosa fria</h2>
+          <p>Una promo pensada para compartir sin afan.</p>
+        </div>
+      </section>
+
+      <section
+        class="promo-card"
+        data-promo="1"
+        data-promo-label="Combo Pizzeta + Gaseosa Litro"
+      >
+        <h2>Combo Pizzeta + Gaseosa Litro</h2>
+        <p>Lunes a viernes por $30.000 (precio regular $34.000).</p>
+        <div class="promo-price">$30.000</div>
+        <button
+          class="card-action promo-action"
+          type="button"
+          aria-label="Pedir"
+        >
+          Pedir
+        </button>
+      </section>
+    </main>
+
+    <nav class="tab-bar" aria-label="Navegacion principal">
+      <a class="tab-link" data-page="inicio" href="../index.html">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">Inicio</span>
+      </a>
+      <a class="tab-link" data-page="pizzas" href="pizzas.html">
+        <span class="tab-icon">🍕</span>
+        <span class="tab-label">Pizzas</span>
+      </a>
+      <a class="tab-link" data-page="panzerottis" href="panzerottis.html">
+        <span class="tab-icon">🥟</span>
+        <span class="tab-label">Panzerottis</span>
+      </a>
+      <a class="tab-link" data-page="promo" href="promo.html">
+        <span class="tab-icon">⭐</span>
+        <span class="tab-label">Promo</span>
+      </a>
+    </nav>
+  </body>
+</html>

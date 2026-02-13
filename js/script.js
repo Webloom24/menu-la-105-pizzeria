@@ -1,0 +1,2506 @@
+/* ============================================
+  PIZZERIA LA 105 - JAVASCRIPT PREMIUM
+   Funcionalidades avanzadas con UX intuitiva
+   ============================================ */
+
+// === UTILIDADES DE RENDIMIENTO ===
+
+// Throttle: limita la frecuencia de ejecución de una función
+function throttle(func, limit) {
+  let inThrottle;
+  return function (...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+}
+
+// RequestAnimationFrame para animaciones suaves
+function rafThrottle(func) {
+  let ticking = false;
+  return function (...args) {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        func.apply(this, args);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  };
+}
+
+// Detectar si es móvil para optimizaciones específicas
+const esMobile =
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  ) || window.innerWidth <= 768;
+
+// === CACHÉ DE ELEMENTOS DOM PARA MEJOR RENDIMIENTO ===
+let productosCache = null;
+let seccionesCache = null;
+
+// Función para obtener productos cacheados
+function getProductosCache() {
+  if (!productosCache) {
+    productosCache = Array.from(document.querySelectorAll(".product-card"));
+  }
+  return productosCache;
+}
+
+// Función para obtener secciones cacheadas
+function getSeccionesCache() {
+  if (!seccionesCache) {
+    seccionesCache = Array.from(document.querySelectorAll(".menu-section"));
+  }
+  return seccionesCache;
+}
+
+// === ESTADO GLOBAL ===
+let carrito = [];
+let productoActual = null;
+let adicionalesDisponibles = [];
+
+// === WIZARD DE 3 FASES ===
+let wizardFaseActual = 1;
+let wizardCantidad = 1;
+let wizardConfiguraciones = []; // Array de configuraciones [{ adicionales: [...] }]
+
+// Número de WhatsApp (CAMBIAR POR EL REAL)
+let WHATSAPP_NUMBER = "573204132725";
+
+// === CARGA DINÁMICA DEL MENÚ ===
+const MENU_DATA_URL = "data/menu-data.json";
+const MENU_STORAGE_KEY = "la105-menu-data";
+const MENU_CACHE_KEY = "la105-menu-cache";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos de caché
+let menuData = null;
+let menuCargadoDinamicamente = false;
+
+// === INICIALIZACIÓN ===
+document.addEventListener("DOMContentLoaded", async function () {
+  // Inicializar Supabase si está disponible
+  if (typeof SupabaseDB !== "undefined") {
+    SupabaseDB.init();
+  }
+
+  // Intentar cargar menú dinámico
+  await cargarMenuDinamico();
+
+  inicializarBuscador();
+  inicializarFiltros();
+  inicializarNavegacion();
+  inicializarCardPedido();
+  cargarCarritoDesdeLocalStorage();
+  animarElementos();
+
+  // Escuchar cambios de localStorage (sincronización entre pestañas)
+  window.addEventListener("storage", function (e) {
+    if (e.key === MENU_STORAGE_KEY || e.key === MENU_CACHE_KEY) {
+      location.reload();
+    }
+  });
+});
+
+// === CARGAR MENÚ DINÁMICO ===
+async function cargarMenuDinamico() {
+  // 1. Verificar caché válido primero (para carga rápida)
+  const cachedData = obtenerCacheValido();
+  if (cachedData) {
+    menuData = cachedData;
+    renderizarMenuCompleto();
+    // Actualizar en segundo plano desde Supabase
+    actualizarDesdeSupabaseEnSegundoPlano();
+    return;
+  }
+
+  // 2. Intentar cargar desde Supabase (datos en la nube)
+  if (typeof SupabaseDB !== "undefined") {
+    try {
+      menuData = await SupabaseDB.cargarMenuCompleto(true); // true = solo visibles
+      guardarEnCache(menuData);
+      renderizarMenuCompleto();
+      console.log("Menú cargado desde Supabase");
+      return;
+    } catch (e) {
+      console.warn("Error cargando desde Supabase:", e);
+    }
+  }
+
+  // 3. Intentar desde localStorage (caché antiguo)
+  const localData = localStorage.getItem(MENU_STORAGE_KEY);
+  if (localData) {
+    try {
+      menuData = JSON.parse(localData);
+      renderizarMenuCompleto();
+      return;
+    } catch (e) {
+      console.warn("Error parsing localStorage:", e);
+    }
+  }
+
+  // 4. Intentar desde JSON externo (fallback)
+  try {
+    const response = await fetch(MENU_DATA_URL);
+    if (response.ok) {
+      menuData = await response.json();
+      renderizarMenuCompleto();
+      return;
+    }
+  } catch (e) {
+    console.warn("No se pudo cargar menu-data.json, usando HTML estático");
+  }
+
+  // 5. Usar HTML estático (ya está renderizado)
+  menuCargadoDinamicamente = false;
+}
+
+// Obtener caché válido (no expirado)
+function obtenerCacheValido() {
+  try {
+    const cacheStr = localStorage.getItem(MENU_CACHE_KEY);
+    if (!cacheStr) return null;
+
+    const cache = JSON.parse(cacheStr);
+    const ahora = Date.now();
+
+    if (ahora - cache.timestamp < CACHE_DURATION) {
+      return cache.data;
+    }
+  } catch (e) {
+    console.warn("Error leyendo caché:", e);
+  }
+  return null;
+}
+
+// Guardar en caché con timestamp
+function guardarEnCache(data) {
+  try {
+    const cache = {
+      timestamp: Date.now(),
+      data: data,
+    };
+    localStorage.setItem(MENU_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    console.warn("Error guardando caché:", e);
+  }
+}
+
+// Actualizar desde Supabase en segundo plano (sin bloquear UI)
+async function actualizarDesdeSupabaseEnSegundoPlano() {
+  if (typeof SupabaseDB === "undefined") return;
+
+  try {
+    const nuevosDatos = await SupabaseDB.cargarMenuCompleto(true);
+    guardarEnCache(nuevosDatos);
+
+    // Si hay cambios significativos, actualizar UI
+    if (JSON.stringify(nuevosDatos) !== JSON.stringify(menuData)) {
+      menuData = nuevosDatos;
+      renderizarMenuCompleto();
+      console.log("Menú actualizado desde Supabase");
+    }
+  } catch (e) {
+    console.warn("Error actualizando desde Supabase:", e);
+  }
+}
+
+// === RENDERIZAR MENÚ COMPLETO ===
+function renderizarMenuCompleto() {
+  if (!menuData) return;
+
+  menuCargadoDinamicamente = true;
+
+  // Actualizar configuración
+  if (menuData.config) {
+    WHATSAPP_NUMBER = menuData.config.whatsapp || WHATSAPP_NUMBER;
+    actualizarConfiguracionUI();
+  }
+
+  // Renderizar categorías y productos
+  renderizarCategoriasYProductos();
+
+  // Limpiar caché
+  productosCache = null;
+  seccionesCache = null;
+}
+
+function actualizarConfiguracionUI() {
+  const config = menuData.config;
+
+  // Actualizar hero
+  const heroTitle = document.querySelector(".hero-title");
+  const heroSubtitle = document.querySelector(".hero-subtitle");
+  if (heroTitle && config.nombreRestaurante)
+    heroTitle.textContent = config.nombreRestaurante;
+  if (heroSubtitle && config.slogan) heroSubtitle.textContent = config.slogan;
+
+  // Actualizar footer
+  const footerTitle = document.querySelector(".footer-content h3");
+  const footerSlogan = document.querySelector(".footer-content > p");
+  const footerPhone = document.querySelector('.footer-info a[href^="tel:"]');
+  const footerHorario = document.querySelector(".footer-info");
+
+  if (footerTitle && config.nombreRestaurante)
+    footerTitle.textContent = config.nombreRestaurante;
+  if (footerSlogan && config.slogan) footerSlogan.textContent = config.slogan;
+  if (footerPhone && config.telefono) {
+    footerPhone.textContent = config.telefono;
+    footerPhone.href = `tel:+${config.whatsapp}`;
+  }
+}
+
+function renderizarCategoriasYProductos() {
+  const mainContent = document.querySelector(".main-content");
+  if (!mainContent) return;
+
+  // Limpiar secciones existentes
+  mainContent.innerHTML = "";
+
+  const productosVisibles = menuData.productos.filter((p) => p.visible);
+
+  const obtenerOrdenCategoria = (id) => {
+    const categoria = menuData.categorias.find((c) => c.id === id);
+    return categoria ? categoria.orden : 99;
+  };
+
+  const ordenarProductos = (a, b) => {
+    const ordenA = obtenerOrdenCategoria(a.categoria);
+    const ordenB = obtenerOrdenCategoria(b.categoria);
+    if (ordenA !== ordenB) return ordenA - ordenB;
+    return (a.orden || 0) - (b.orden || 0);
+  };
+
+  const esRueda = (producto) => /^(Rueda)\./i.test(producto.descripcion || "");
+  const esPorcion = (producto) =>
+    /^(Porcion|Porción)\./i.test(producto.descripcion || "");
+
+  const secciones = [
+    {
+      id: "para-compartir",
+      nombre: "Para compartir en el barrio",
+      emoji: "🍕",
+      subtitulo: "Ruedas y pizzetas para mesa larga",
+      productos: productosVisibles
+        .filter(
+          (p) =>
+            p.categoria === "pizzetas" ||
+            (esRueda(p) && p.categoria !== "panzerottis"),
+        )
+        .sort(ordenarProductos),
+    },
+    {
+      id: "antojos-individuales",
+      nombre: "Antojos individuales",
+      emoji: "🍽️",
+      subtitulo: "Porciones calientes y adicionales de mesa",
+      productos: productosVisibles
+        .filter(
+          (p) =>
+            p.categoria === "adicionales" ||
+            (esPorcion(p) && p.categoria !== "panzerottis"),
+        )
+        .sort(ordenarProductos),
+    },
+    {
+      id: "hechos-al-momento",
+      nombre: "Hechos al momento",
+      emoji: "🔥",
+      subtitulo: "Panzerottis al horno, 30 minutos",
+      productos: productosVisibles
+        .filter((p) => p.categoria === "panzerottis")
+        .sort(ordenarProductos),
+    },
+  ];
+
+  secciones.forEach((seccion) => {
+    if (!seccion.productos.length) return;
+    const nodo = crearSeccionCategoria(seccion, seccion.productos);
+    mainContent.appendChild(nodo);
+  });
+
+  actualizarNavegacionDinamica(secciones);
+}
+
+function crearSeccionCategoria(categoria, productos) {
+  const section = document.createElement("section");
+  section.id = categoria.id;
+  section.className = "menu-section";
+  section.dataset.section = categoria.id;
+
+  // Header de sección
+  const header = document.createElement("div");
+  header.className = "section-header";
+  const iconHtml = categoria.icono
+    ? `<img src="${categoria.icono}" alt="${categoria.nombre}" class="section-icon" loading="lazy">`
+    : `<div class="section-emoji">${categoria.emoji || ""}</div>`;
+  header.innerHTML = `
+    ${iconHtml}
+    <div>
+      <h2 class="section-title">${categoria.nombre}</h2>
+      <p class="section-subtitle">${categoria.subtitulo || ""}</p>
+    </div>
+  `;
+
+  // Grid de productos
+  const grid = document.createElement("div");
+  grid.className = "products-grid";
+
+  productos.forEach((producto) => {
+    const card = crearProductoCard(producto);
+    grid.appendChild(card);
+  });
+
+  section.appendChild(header);
+  const media = document.createElement("div");
+  media.className = "section-media";
+  media.setAttribute("aria-hidden", "true");
+  section.appendChild(media);
+  section.appendChild(grid);
+
+  return section;
+}
+
+function crearProductoCard(producto) {
+  const article = document.createElement("article");
+  article.className = "product-card";
+  if (producto.imagen) article.classList.add("has-image");
+
+  let descripcionLimpia = producto.descripcion || "";
+  let sizeLabel = "";
+  const sizeMatch = descripcionLimpia.match(/^(Porción|Porcion|Rueda)\.\s*/i);
+  if (sizeMatch) {
+    sizeLabel = sizeMatch[1].toLowerCase().includes("rueda")
+      ? "Rueda"
+      : "Porción";
+    descripcionLimpia = descripcionLimpia.replace(sizeMatch[0], "").trim();
+  }
+
+  article.dataset.price = producto.precio;
+  article.dataset.category = obtenerCategoriaFiltro(producto.precio);
+  article.dataset.size = sizeLabel;
+  article.dataset.description = descripcionLimpia;
+  article.classList.add(`cat-${producto.categoria}`);
+  if (sizeLabel) {
+    article.classList.add(`size-${sizeLabel.toLowerCase()}`);
+  }
+  if (producto.categoria === "pizzas-tradicionales") {
+    article.classList.add("card-tradicional");
+  }
+  if (producto.categoria === "pizzas-especiales" && sizeLabel === "Rueda") {
+    article.classList.add("card-hero");
+  }
+
+  // Badge
+  let badgeHtml = "";
+  if (producto.badge && menuData.badges[producto.badge]) {
+    const badge = menuData.badges[producto.badge];
+    badgeHtml = `<div class="product-badge ${badge.clase}">${badge.texto}</div>`;
+  }
+
+  // Imagen
+  let imagenHtml = "";
+  if (producto.imagen) {
+    imagenHtml = `<div class="product-image"><img src="${producto.imagen}" alt="${producto.nombre}" loading="lazy"></div>`;
+  }
+
+  const sizeHtml = sizeLabel
+    ? `<span class="product-size">${sizeLabel}</span>`
+    : "";
+
+  article.innerHTML = `
+    ${badgeHtml}
+    ${imagenHtml}
+    <h3 class="product-name">${producto.nombre} ${sizeHtml}</h3>
+    <p class="product-description">${descripcionLimpia}</p>
+    <p class="product-price">$${producto.precio.toLocaleString("es-CO")}</p>
+    <button class="btn-primary" onclick="abrirModal(this)" aria-label="Agregar al carrito">¡A la mesa!</button>
+  `;
+
+  return article;
+}
+
+function obtenerCategoriaFiltro(precio) {
+  if (precio < 20000) return "economico";
+  if (precio <= 30000) return "medio";
+  return "premium";
+}
+
+function actualizarNavegacionDinamica(categorias) {
+  // Actualizar navbar principal
+  const navContainer = document.querySelector(".nav-container");
+  if (navContainer) {
+    navContainer.innerHTML = categorias
+      .map(
+        (cat) =>
+          `<a href="#${cat.id}" class="nav-link">${cat.emoji} ${cat.nombre}</a>`,
+      )
+      .join("");
+  }
+
+  // Actualizar menú flotante
+  const floatingNav = document.querySelector(".floating-menu-nav");
+  if (floatingNav) {
+    floatingNav.innerHTML = categorias
+      .map(
+        (cat) =>
+          `<a href="#${cat.id}" onclick="navegarASeccion('${cat.id}', event)">${cat.emoji} ${cat.nombre}</a>`,
+      )
+      .join("");
+  }
+}
+
+function obtenerAdicionalesDisponibles() {
+  if (!menuData || !menuData.productos) return [];
+  return menuData.productos
+    .filter(
+      (producto) =>
+        producto.categoria === "adicionales" && producto.visible !== false,
+    )
+    .sort((a, b) => a.orden - b.orden);
+}
+// === BUSCADOR MEJORADO ===
+let searchTimeout = null;
+let searchHistory = JSON.parse(
+  localStorage.getItem("la105-search-history") || "[]",
+);
+
+function inicializarBuscador() {
+  const buscador = document.getElementById("buscador");
+  const resultadoTexto = document.getElementById("resultado-busqueda");
+  const searchClear = document.getElementById("search-clear");
+  const searchLoader = document.getElementById("search-loader");
+  const searchSuggestions = document.getElementById("search-suggestions");
+  const searchHistoryEl = document.getElementById("search-history");
+
+  // Mostrar historial al enfocar el buscador vacío
+  buscador.addEventListener("focus", function () {
+    if (this.value.trim() === "" && searchHistory.length > 0) {
+      mostrarHistorial();
+    }
+  });
+
+  // Ocultar historial/sugerencias al perder foco
+  buscador.addEventListener("blur", function () {
+    setTimeout(() => {
+      searchSuggestions.classList.remove("visible");
+      searchHistoryEl.classList.remove("visible");
+    }, 200);
+  });
+
+  // Búsqueda con debounce
+  buscador.addEventListener("input", function () {
+    const textoBusqueda = this.value.trim();
+
+    // Mostrar/ocultar botón limpiar
+    if (textoBusqueda.length > 0) {
+      searchClear.classList.add("visible");
+    } else {
+      searchClear.classList.remove("visible");
+    }
+
+    // Ocultar historial
+    searchHistoryEl.classList.remove("visible");
+
+    // Limpiar timeout anterior
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    if (textoBusqueda === "") {
+      searchLoader.classList.remove("visible");
+      searchSuggestions.classList.remove("visible");
+      resetearBusqueda();
+      return;
+    }
+
+    // Mostrar loader
+    searchLoader.classList.add("visible");
+
+    // Debounce adaptativo: 400ms en móvil, 250ms en desktop
+    const debounceTime = esMobile ? 400 : 250;
+    searchTimeout = setTimeout(() => {
+      ejecutarBusqueda(textoBusqueda);
+      searchLoader.classList.remove("visible");
+    }, debounceTime);
+  });
+
+  // Botón limpiar
+  searchClear.addEventListener("click", function () {
+    buscador.value = "";
+    searchClear.classList.remove("visible");
+    searchSuggestions.classList.remove("visible");
+    resetearBusqueda();
+    buscador.focus();
+  });
+
+  // Enter para guardar en historial
+  buscador.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && this.value.trim() !== "") {
+      guardarEnHistorial(this.value.trim());
+      searchSuggestions.classList.remove("visible");
+    }
+  });
+}
+
+// Mapeo de categorías con aliases para búsqueda
+const categoriasMap = {
+  pizzasEspeciales: {
+    id: "pizzas-especiales",
+    nombre: "Especialidades 105",
+    icono: "🍕",
+    aliases: [
+      "especialidades",
+      "especiales",
+      "pizza especial",
+      "pizzas especiales",
+    ],
+  },
+  pizzasTradicionales: {
+    id: "pizzas-tradicionales",
+    nombre: "Sabores Tradicionales",
+    icono: "🍕",
+    aliases: [
+      "tradicional",
+      "tradicionales",
+      "pizza tradicional",
+      "pizzas tradicionales",
+    ],
+  },
+  pizzetas: {
+    id: "pizzetas",
+    nombre: "Pizzetas",
+    icono: "📏",
+    aliases: ["pizzeta", "pizzetas", "tamano", "tamanos", "tamaño", "tamaños"],
+  },
+  panzerottis: {
+    id: "panzerottis",
+    nombre: "Panzerottis",
+    icono: "🥟",
+    aliases: ["panzerotti", "panzerottis", "panzeroti"],
+  },
+  adicionales: {
+    id: "adicionales",
+    nombre: "Adicionales",
+    icono: "➕",
+    aliases: ["adicional", "adicionales", "extra", "extras"],
+  },
+};
+
+// Detectar precio de forma permisiva
+function detectarPrecio(texto) {
+  const textoLimpio = texto.trim().toLowerCase();
+
+  // Patrones de precio que aceptamos
+  // $20.000, $20000, 20.000, 20000, 20mil, 20 mil, veinte mil, etc.
+
+  // Si contiene letras que no sean "mil" o "k", probablemente no es precio
+  if (/[a-z]/i.test(textoLimpio.replace(/mil|k/gi, ""))) {
+    return { esPrecio: false, valor: 0 };
+  }
+
+  // Detectar formatos numéricos: $20.000, 20.000, $20000, 20000
+  const matchNumerico = textoLimpio.match(/^\$?\s*([\d.,\s]+)\s*(mil|k)?$/i);
+  if (matchNumerico) {
+    let numero = matchNumerico[1].replace(/[.,\s]/g, "");
+    let valor = parseInt(numero);
+
+    if (isNaN(valor)) return { esPrecio: false, valor: 0 };
+
+    // Si tiene "mil" o "k", multiplicar por 1000
+    if (matchNumerico[2]) {
+      valor *= 1000;
+    }
+    // Si el número es muy pequeño (< 100), asumir que son miles
+    else if (valor > 0 && valor < 100) {
+      valor *= 1000;
+    }
+
+    // Validar que sea un precio razonable (entre 1000 y 100000)
+    if (valor >= 1000 && valor <= 100000) {
+      return { esPrecio: true, valor: valor };
+    }
+  }
+
+  return { esPrecio: false, valor: 0 };
+}
+
+function detectarCategoria(texto) {
+  const textoLower = texto.toLowerCase().trim();
+
+  // Solo detectar categoría si el texto coincide exactamente o casi exactamente con un alias
+  // No detectar si hay palabras adicionales que podrían ser nombres de productos
+  for (const [key, cat] of Object.entries(categoriasMap)) {
+    for (const alias of cat.aliases) {
+      // Coincidencia exacta
+      if (textoLower === alias) {
+        return cat;
+      }
+    }
+  }
+  return null;
+}
+
+function obtenerSugerenciasCategorias(texto) {
+  const textoLower = texto.toLowerCase().trim();
+  const sugerencias = [];
+
+  if (textoLower.length < 2) return sugerencias;
+
+  // Solo sugerir categorías si el texto es una sola palabra o coincide con el inicio de un alias
+  // Evitar sugerir categorías cuando hay múltiples palabras (probablemente es un nombre de producto)
+  const palabras = textoLower.split(/\s+/);
+  if (palabras.length > 1) return sugerencias;
+
+  for (const [key, cat] of Object.entries(categoriasMap)) {
+    for (const alias of cat.aliases) {
+      if (
+        alias.startsWith(textoLower) ||
+        cat.nombre.toLowerCase().startsWith(textoLower)
+      ) {
+        if (!sugerencias.find((s) => s.id === cat.id)) {
+          sugerencias.push(cat);
+        }
+        break;
+      }
+    }
+  }
+  return sugerencias;
+}
+
+function ejecutarBusqueda(textoBusqueda) {
+  // Usar caché de productos para mejor rendimiento
+  const productos = getProductosCache();
+  const secciones = getSeccionesCache();
+  const resultadoTexto = document.getElementById("resultado-busqueda");
+  const searchSuggestions = document.getElementById("search-suggestions");
+
+  const textoLower = textoBusqueda.toLowerCase();
+  let productosEncontrados = 0;
+  let sugerencias = [];
+
+  // Detectar si es búsqueda por precio (más permisivo)
+  const resultadoPrecio = detectarPrecio(textoBusqueda);
+  const esBusquedaPrecio = resultadoPrecio.esPrecio;
+  let precioObjetivo = resultadoPrecio.valor;
+
+  // Detectar si es búsqueda por categoría
+  const categoriaDetectada = detectarCategoria(textoBusqueda);
+  const esBusquedaCategoria = categoriaDetectada !== null;
+
+  productos.forEach(function (producto) {
+    const nombre = producto.querySelector(".product-name").textContent;
+    const nombreLower = nombre.toLowerCase();
+    const descripcion = producto.querySelector(
+      ".product-description",
+    ).textContent;
+    const descripcionLower = descripcion.toLowerCase();
+    const precioTexto = producto.querySelector(".product-price").textContent;
+    const precio = parseInt(precioTexto.replace(/\D/g, ""));
+    const seccion = producto.closest(".menu-section");
+    const categoria = seccion ? seccion.getAttribute("data-section") : "";
+
+    let coincide = false;
+
+    if (esBusquedaCategoria) {
+      // Búsqueda por categoría
+      coincide = categoria === categoriaDetectada.id;
+    } else if (esBusquedaPrecio) {
+      // Búsqueda por precio con rango adaptativo
+      // ±3000 para precios bajos, ±5000 para precios altos
+      const rango = precioObjetivo <= 20000 ? 3000 : 5000;
+      coincide = Math.abs(precio - precioObjetivo) <= rango;
+    } else {
+      // Búsqueda normal + fuzzy
+      coincide =
+        nombreLower.includes(textoLower) ||
+        descripcionLower.includes(textoLower) ||
+        fuzzyMatch(textoLower, nombreLower) ||
+        fuzzyMatch(textoLower, descripcionLower);
+    }
+
+    if (coincide) {
+      producto.style.display = "block";
+      producto.style.animation = "fadeInScale 0.3s ease-out";
+      productosEncontrados++;
+
+      // Resaltar texto encontrado (no en búsqueda por categoría)
+      resaltarTexto(
+        producto,
+        textoBusqueda,
+        esBusquedaPrecio || esBusquedaCategoria,
+      );
+
+      // Agregar a sugerencias de productos (máximo 5)
+      if (sugerencias.length < 5 && !esBusquedaCategoria) {
+        sugerencias.push({
+          tipo: "producto",
+          nombre: nombre,
+          precio: precioTexto,
+          categoria: categoria,
+          elemento: producto,
+        });
+      }
+    } else {
+      producto.style.display = "none";
+      quitarResaltado(producto);
+    }
+  });
+
+  // Ocultar secciones vacías
+  secciones.forEach(function (seccion) {
+    const productosVisibles = seccion.querySelectorAll(
+      ".product-card[style*='display: block']",
+    ).length;
+    const productosNoOcultos = Array.from(
+      seccion.querySelectorAll(".product-card"),
+    ).filter((p) => p.style.display !== "none").length;
+
+    if (productosVisibles === 0 && productosNoOcultos === 0) {
+      seccion.classList.add("hidden-section");
+    } else {
+      seccion.classList.remove("hidden-section");
+    }
+  });
+
+  // Agregar sugerencias de categorías al inicio
+  const sugerenciasCategorias = obtenerSugerenciasCategorias(textoBusqueda);
+
+  // Mostrar sugerencias combinadas (categorías + productos)
+  if (
+    (sugerencias.length > 0 || sugerenciasCategorias.length > 0) &&
+    textoBusqueda.length >= 2 &&
+    !esBusquedaCategoria
+  ) {
+    mostrarSugerenciasCombinadas(
+      sugerenciasCategorias,
+      sugerencias,
+      textoBusqueda,
+    );
+  } else {
+    searchSuggestions.classList.remove("visible");
+  }
+
+  // Mostrar resultado
+  if (textoBusqueda === "") {
+    resultadoTexto.textContent = "";
+  } else if (esBusquedaCategoria) {
+    resultadoTexto.innerHTML = `${categoriaDetectada.icono} <strong>${categoriaDetectada.nombre}</strong> - ${productosEncontrados} producto(s)`;
+    resultadoTexto.style.color = "#25D366";
+  } else if (esBusquedaPrecio) {
+    const precioFormateado = precioObjetivo.toLocaleString("es-CO");
+    const rango = precioObjetivo <= 20000 ? 3000 : 5000;
+    const rangoFormateado = rango.toLocaleString("es-CO");
+    if (productosEncontrados === 0) {
+      resultadoTexto.innerHTML = `💰 No hay productos cerca de <strong>$${precioFormateado}</strong>`;
+      resultadoTexto.style.color = "#C23D1F";
+    } else {
+      resultadoTexto.innerHTML = `💰 ${productosEncontrados} producto(s) cerca de <strong>$${precioFormateado}</strong> <span style="color: #666; font-size: 12px;">(±$${rangoFormateado})</span>`;
+      resultadoTexto.style.color = "#25D366";
+    }
+  } else if (productosEncontrados === 0) {
+    resultadoTexto.innerHTML =
+      '😕 No se encontraron productos. <span style="color: #666; font-size: 13px;">Prueba con otro término</span>';
+    resultadoTexto.style.color = "#C23D1F";
+  } else {
+    resultadoTexto.textContent = `✅ ${productosEncontrados} producto(s) encontrado(s)`;
+    resultadoTexto.style.color = "#25D366";
+  }
+}
+
+// Fuzzy match - búsqueda tolerante a errores (optimizado para móvil)
+function fuzzyMatch(busqueda, texto) {
+  // En móvil, solo usar fuzzy match para búsquedas de 4+ caracteres
+  const minLength = esMobile ? 4 : 3;
+  if (busqueda.length < minLength) return false;
+
+  // Distancia de Levenshtein simplificada
+  const palabrasBusqueda = busqueda.split(/\s+/);
+  const palabrasTexto = texto.split(/\s+/);
+
+  // Limitar iteraciones en móvil para mejor rendimiento
+  const maxPalabras = esMobile ? 3 : palabrasTexto.length;
+
+  for (const palabraBusqueda of palabrasBusqueda) {
+    if (palabraBusqueda.length < minLength) continue;
+
+    for (let i = 0; i < Math.min(maxPalabras, palabrasTexto.length); i++) {
+      const palabraTexto = palabrasTexto[i];
+      if (palabraTexto.length < 3) continue;
+
+      // Verificar si son similares (tolerancia de 1-2 caracteres)
+      if (calcularSimilitud(palabraBusqueda, palabraTexto) >= 0.7) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function calcularSimilitud(str1, str2) {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+
+  if (longer.length === 0) return 1.0;
+
+  const costs = [];
+  for (let i = 0; i <= longer.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= shorter.length; j++) {
+      if (i === 0) {
+        costs[j] = j;
+      } else if (j > 0) {
+        let newValue = costs[j - 1];
+        if (longer.charAt(i - 1) !== shorter.charAt(j - 1)) {
+          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+        }
+        costs[j - 1] = lastValue;
+        lastValue = newValue;
+      }
+    }
+    if (i > 0) costs[shorter.length] = lastValue;
+  }
+
+  return (longer.length - costs[shorter.length]) / longer.length;
+}
+
+// Resaltar texto encontrado
+function resaltarTexto(producto, busqueda, esPrecio) {
+  const nombreEl = producto.querySelector(".product-name");
+  const descripcionEl = producto.querySelector(".product-description");
+
+  // Guardar texto original
+  if (!nombreEl.dataset.original) {
+    nombreEl.dataset.original = nombreEl.textContent;
+  }
+  if (!descripcionEl.dataset.original) {
+    descripcionEl.dataset.original = descripcionEl.textContent;
+  }
+
+  if (esPrecio) {
+    // No resaltar en búsqueda por precio
+    nombreEl.innerHTML = nombreEl.dataset.original;
+    descripcionEl.innerHTML = descripcionEl.dataset.original;
+    return;
+  }
+
+  const regex = new RegExp(`(${escapeRegex(busqueda)})`, "gi");
+  nombreEl.innerHTML = nombreEl.dataset.original.replace(
+    regex,
+    "<mark>$1</mark>",
+  );
+  descripcionEl.innerHTML = descripcionEl.dataset.original.replace(
+    regex,
+    "<mark>$1</mark>",
+  );
+}
+
+function quitarResaltado(producto) {
+  const nombreEl = producto.querySelector(".product-name");
+  const descripcionEl = producto.querySelector(".product-description");
+
+  if (nombreEl.dataset.original) {
+    nombreEl.innerHTML = nombreEl.dataset.original;
+  }
+  if (descripcionEl.dataset.original) {
+    descripcionEl.innerHTML = descripcionEl.dataset.original;
+  }
+}
+
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Mostrar sugerencias combinadas (categorías + productos)
+function mostrarSugerenciasCombinadas(categorias, productos, busqueda) {
+  const container = document.getElementById("search-suggestions");
+  let html = "";
+
+  // Primero mostrar categorías coincidentes
+  if (categorias.length > 0) {
+    html += '<div class="suggestions-section-header">📂 Categorías</div>';
+    categorias.forEach((cat) => {
+      html += `
+        <div class="suggestion-item suggestion-category-item" onclick="seleccionarCategoria('${cat.aliases[0]}')">
+          <span class="suggestion-icon">${cat.icono}</span>
+          <div class="suggestion-info">
+            <div class="suggestion-name">${cat.nombre}</div>
+            <div class="suggestion-category">Ver todos los productos</div>
+          </div>
+          <span class="suggestion-arrow">→</span>
+        </div>
+      `;
+    });
+  }
+
+  // Luego mostrar productos
+  if (productos.length > 0) {
+    if (categorias.length > 0) {
+      html += '<div class="suggestions-section-header">🍽️ Productos</div>';
+    }
+    productos.forEach((sug) => {
+      const cat = categoriasMap[sug.categoria];
+      const icono = cat ? cat.icono : "🍽️";
+      const nombreCat = cat ? cat.nombre : sug.categoria;
+      const nombreResaltado = sug.nombre.replace(
+        new RegExp(`(${escapeRegex(busqueda)})`, "gi"),
+        "<mark>$1</mark>",
+      );
+
+      html += `
+        <div class="suggestion-item" onclick="seleccionarSugerencia('${sug.nombre.replace(/'/g, "\\'")}')">
+          <span class="suggestion-icon">${icono}</span>
+          <div class="suggestion-info">
+            <div class="suggestion-name">${nombreResaltado}</div>
+            <div class="suggestion-category">${nombreCat}</div>
+          </div>
+          <span class="suggestion-price">${sug.precio}</span>
+        </div>
+      `;
+    });
+  }
+
+  if (html === "") {
+    container.classList.remove("visible");
+    return;
+  }
+
+  container.innerHTML = html;
+  container.classList.add("visible");
+}
+
+function seleccionarCategoria(categoria) {
+  const buscador = document.getElementById("buscador");
+  buscador.value = categoria;
+  guardarEnHistorial(categoria);
+  ejecutarBusqueda(categoria);
+  document.getElementById("search-suggestions").classList.remove("visible");
+}
+
+function seleccionarSugerencia(nombre) {
+  const buscador = document.getElementById("buscador");
+  buscador.value = nombre;
+  guardarEnHistorial(nombre);
+  ejecutarBusqueda(nombre);
+  document.getElementById("search-suggestions").classList.remove("visible");
+
+  // Buscar el producto y hacer scroll
+  setTimeout(() => {
+    const productos = document.querySelectorAll(".product-card");
+    for (const producto of productos) {
+      const nombreProducto =
+        producto.querySelector(".product-name").textContent;
+      if (nombreProducto.toLowerCase() === nombre.toLowerCase()) {
+        scrollToProducto(producto);
+        // Mostrar botón para volver
+        mostrarBotonVolverInicio();
+        break;
+      }
+    }
+  }, 100);
+}
+
+// Función para hacer scroll al producto de forma óptima
+function scrollToProducto(producto) {
+  // Obtener dimensiones
+  const rect = producto.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+  const navbarHeight = document.querySelector(".navbar")?.offsetHeight || 60;
+  const offsetTop = navbarHeight + 20;
+
+  const productoHeight = rect.height;
+  const espacioDisponible = viewportHeight - offsetTop - 20;
+
+  let scrollPosition;
+
+  if (productoHeight <= espacioDisponible) {
+    const centroViewport = (espacioDisponible - productoHeight) / 2;
+    scrollPosition = window.scrollY + rect.top - offsetTop - centroViewport;
+  } else {
+    scrollPosition = window.scrollY + rect.top - offsetTop;
+  }
+
+  scrollPosition = Math.max(0, scrollPosition);
+
+  // En móvil usar scroll nativo (más fluido), en desktop smooth
+  if (esMobile) {
+    window.scrollTo(0, scrollPosition);
+  } else {
+    window.scrollTo({
+      top: scrollPosition,
+      behavior: "smooth",
+    });
+  }
+
+  // Efecto visual más ligero en móvil
+  requestAnimationFrame(() => {
+    producto.style.transition = "box-shadow 0.2s ease";
+    producto.style.boxShadow = "0 0 0 3px var(--color-primary)";
+
+    setTimeout(() => {
+      producto.style.boxShadow = "";
+    }, 1500);
+  });
+}
+
+// Historial de búsquedas
+function mostrarHistorial() {
+  const container = document.getElementById("search-history");
+
+  if (searchHistory.length === 0) {
+    container.classList.remove("visible");
+    return;
+  }
+
+  let html = `
+    <div class="history-header">
+      <span>🕐 Búsquedas recientes</span>
+      <button class="history-clear" onclick="limpiarHistorial()">Limpiar</button>
+    </div>
+  `;
+
+  searchHistory.slice(0, 5).forEach((item) => {
+    html += `<div class="history-item" onclick="usarHistorial('${item}')">${item}</div>`;
+  });
+
+  container.innerHTML = html;
+  container.classList.add("visible");
+}
+
+function guardarEnHistorial(termino) {
+  // Evitar duplicados
+  searchHistory = searchHistory.filter(
+    (item) => item.toLowerCase() !== termino.toLowerCase(),
+  );
+  searchHistory.unshift(termino);
+  // Máximo 10 items
+  searchHistory = searchHistory.slice(0, 10);
+  localStorage.setItem("la105-search-history", JSON.stringify(searchHistory));
+}
+
+function usarHistorial(termino) {
+  const buscador = document.getElementById("buscador");
+  buscador.value = termino;
+  document.getElementById("search-history").classList.remove("visible");
+  document.getElementById("search-clear").classList.add("visible");
+  ejecutarBusqueda(termino);
+
+  // Buscar el primer producto visible y hacer scroll
+  setTimeout(() => {
+    const productos = document.querySelectorAll(".product-card");
+    for (const producto of productos) {
+      if (producto.style.display !== "none") {
+        const nombreProducto =
+          producto.querySelector(".product-name").textContent;
+        // Si el término coincide exactamente con el nombre, ir a ese producto
+        if (nombreProducto.toLowerCase() === termino.toLowerCase()) {
+          scrollToProducto(producto);
+          mostrarBotonVolverInicio();
+          return;
+        }
+      }
+    }
+    // Si no hay coincidencia exacta, ir al primer producto visible
+    for (const producto of productos) {
+      if (producto.style.display !== "none") {
+        scrollToProducto(producto);
+        mostrarBotonVolverInicio();
+        break;
+      }
+    }
+  }, 150);
+}
+
+function limpiarHistorial() {
+  searchHistory = [];
+  localStorage.removeItem("la105-search-history");
+  document.getElementById("search-history").classList.remove("visible");
+}
+
+function resetearBusqueda() {
+  // Usar caché para mejor rendimiento
+  const productos = getProductosCache();
+  const secciones = getSeccionesCache();
+  const resultadoTexto = document.getElementById("resultado-busqueda");
+
+  productos.forEach(function (producto) {
+    producto.style.display = "block";
+    quitarResaltado(producto);
+  });
+
+  secciones.forEach(function (seccion) {
+    seccion.classList.remove("hidden-section");
+  });
+
+  resultadoTexto.textContent = "";
+
+  // Ocultar botón de volver
+  ocultarBotonVolverInicio();
+}
+
+// === BOTÓN FLOTANTE PARA VOLVER AL INICIO ===
+function mostrarBotonVolverInicio() {
+  let boton = document.getElementById("btn-volver-inicio");
+
+  if (!boton) {
+    // Crear el botón si no existe
+    boton = document.createElement("button");
+    boton.id = "btn-volver-inicio";
+    boton.className = "btn-volver-inicio";
+    boton.innerHTML = `
+      <span class="btn-volver-icon">↑</span>
+      <span class="btn-volver-text">Ver todo el menú</span>
+    `;
+    boton.onclick = volverAlInicio;
+    document.body.appendChild(boton);
+  }
+
+  // Mostrar con animación
+  setTimeout(() => {
+    boton.classList.add("visible");
+  }, 500);
+}
+
+function ocultarBotonVolverInicio() {
+  const boton = document.getElementById("btn-volver-inicio");
+  if (boton) {
+    boton.classList.remove("visible");
+  }
+}
+
+function volverAlInicio() {
+  // Limpiar búsqueda
+  const buscador = document.getElementById("buscador");
+  const searchClear = document.getElementById("search-clear");
+
+  buscador.value = "";
+  searchClear.classList.remove("visible");
+  resetearBusqueda();
+
+  // Scroll suave al inicio de las secciones de productos
+  const mainContent = document.querySelector(".main-content");
+  if (mainContent) {
+    const offsetTop = document.querySelector(".navbar")?.offsetHeight || 60;
+    window.scrollTo({
+      top: mainContent.offsetTop - offsetTop - 10,
+      behavior: "smooth",
+    });
+  }
+
+  // Mostrar notificación sutil
+  mostrarNotificacion("✅ Mostrando todos los productos", "success");
+}
+
+// === FILTROS POR PRECIO ===
+function inicializarFiltros() {
+  const filtros = document.querySelectorAll(".filter-btn");
+
+  filtros.forEach(function (filtro) {
+    filtro.addEventListener("click", function () {
+      // Remover active de todos
+      filtros.forEach((f) => f.classList.remove("active"));
+      // Agregar active al clickeado
+      this.classList.add("active");
+
+      const categoria = this.getAttribute("data-filter");
+      const productos = document.querySelectorAll(".product-card");
+
+      productos.forEach(function (producto) {
+        if (categoria === "todos") {
+          producto.style.display = "block";
+          producto.style.animation = "fadeInScale 0.3s ease-out";
+        } else {
+          const productoCategoria = producto.getAttribute("data-category");
+          if (productoCategoria === categoria) {
+            producto.style.display = "block";
+            producto.style.animation = "fadeInScale 0.3s ease-out";
+          } else {
+            producto.style.display = "none";
+          }
+        }
+      });
+    });
+  });
+}
+
+// === NAVEGACIÓN ACTIVA ===
+function inicializarNavegacion() {
+  const navLinks = document.querySelectorAll(".nav-link");
+  const sections = document.querySelectorAll(".menu-section");
+
+  // Función optimizada con throttle para mejor rendimiento
+  const actualizarNavActiva = throttle(function () {
+    let current = "";
+    const scrollPos = window.scrollY;
+
+    sections.forEach((section) => {
+      const sectionTop = section.offsetTop;
+      if (scrollPos >= sectionTop - 200) {
+        current = section.getAttribute("id");
+      }
+    });
+
+    navLinks.forEach((link) => {
+      link.classList.remove("active");
+      if (link.getAttribute("href") === "#" + current) {
+        link.classList.add("active");
+      }
+    });
+  }, 100);
+
+  // Usar passive: true para mejor rendimiento de scroll
+  window.addEventListener("scroll", actualizarNavActiva, { passive: true });
+}
+
+// === CARD DE PEDIDO ===
+function inicializarCardPedido() {
+  // Event listeners para botones de tipo de pedido
+  document
+    .querySelectorAll(".tipo-option:not(.metodo-pago-option)")
+    .forEach((btn) => {
+      btn.addEventListener("click", function () {
+        seleccionarTipoPedido(this.getAttribute("data-tipo"));
+      });
+    });
+
+  // Event listeners para botones de método de pago
+  document.querySelectorAll(".metodo-pago-option").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      seleccionarMetodoPago(this.getAttribute("data-metodo"));
+    });
+  });
+
+  // Event listener para cerrar card con overlay
+  document
+    .getElementById("pedido-card")
+    .addEventListener("click", function (e) {
+      if (e.target === this) {
+        cerrarCardPedido();
+      }
+    });
+}
+
+// === MODAL DE PRODUCTO ===
+function abrirModal(boton) {
+  const card = boton.closest(".product-card");
+  const nombre = card.querySelector(".product-name").textContent;
+  const descripcion =
+    card.dataset.description ||
+    card.querySelector(".product-description").textContent;
+  const precioTexto = card.querySelector(".product-price").textContent;
+  const precio = parseInt(precioTexto.replace(/\D/g, ""));
+  const sizeLabel = card.dataset.size || "";
+  const nombreMostrar = sizeLabel
+    ? `${nombre.replace(sizeLabel, "").trim()} (${sizeLabel})`
+    : nombre;
+
+  // Obtener la categoría del producto desde la sección
+  const section = card.closest(".menu-section");
+  const categoria = section ? section.getAttribute("data-section") : "";
+
+  // Guardar producto actual
+  productoActual = {
+    nombre: nombre.replace(sizeLabel, "").trim(),
+    nombreMostrar: nombreMostrar,
+    descripcion: descripcion,
+    precioBase: precio,
+    precio: precio,
+    categoria: categoria,
+    sizeLabel: sizeLabel,
+  };
+
+  // Llenar modal
+  document.getElementById("modal-nombre").textContent = nombreMostrar;
+  document.getElementById("modal-precio").textContent = precioTexto;
+
+  // Preparar adicionales disponibles
+  adicionalesDisponibles = obtenerAdicionalesDisponibles();
+
+  // Iniciar wizard en fase 1
+  iniciarWizard();
+
+  // Mostrar modal
+  document.getElementById("modal").classList.add("active");
+  document.getElementById("overlay").classList.add("active");
+  document.body.style.overflow = "hidden";
+}
+
+function cerrarModal() {
+  document.getElementById("modal").classList.remove("active");
+  document.getElementById("overlay").classList.remove("active");
+  document.body.style.overflow = "auto";
+  productoActual = null;
+  resetearWizard();
+}
+
+// === WIZARD DE 3 FASES ===
+
+function iniciarWizard() {
+  wizardFaseActual = 1;
+  wizardCantidad = 1;
+  wizardConfiguraciones = [];
+
+  document.getElementById("wizard-cantidad").value = 1;
+  mostrarFase(1);
+}
+
+function resetearWizard() {
+  wizardFaseActual = 1;
+  wizardCantidad = 1;
+  wizardConfiguraciones = [];
+}
+
+function mostrarFase(numeroFase) {
+  // Ocultar todas las fases
+  document.getElementById("fase-cantidad").style.display = "none";
+  document.getElementById("fase-personalizacion").style.display = "none";
+  document.getElementById("fase-resumen").style.display = "none";
+
+  // Mostrar la fase actual
+  if (numeroFase === 1) {
+    document.getElementById("fase-cantidad").style.display = "block";
+  } else if (numeroFase === 2) {
+    document.getElementById("fase-personalizacion").style.display = "block";
+  } else if (numeroFase === 3) {
+    document.getElementById("fase-resumen").style.display = "block";
+  }
+
+  wizardFaseActual = numeroFase;
+
+  // Scroll al inicio del modal (optimizado para móvil)
+  requestAnimationFrame(() => {
+    const modalContent = document.querySelector("#modal .modal-content");
+    const modalBody = document.querySelector("#modal .modal-body");
+
+    if (modalContent) modalContent.scrollTop = 0;
+    if (modalBody) modalBody.scrollTop = 0;
+  });
+}
+
+function cambiarCantidadWizard(cambio) {
+  const input = document.getElementById("wizard-cantidad");
+  let cantidad = parseInt(input.value);
+  cantidad += cambio;
+
+  if (cantidad < 1) cantidad = 1;
+  if (cantidad > 10) cantidad = 10;
+
+  input.value = cantidad;
+  wizardCantidad = cantidad;
+}
+
+function cancelarWizard() {
+  if (wizardFaseActual > 1) {
+    const confirmar = confirm(
+      "¿Seguro que deseas cancelar? Se perderá todo el progreso.",
+    );
+    if (!confirmar) return;
+  }
+  cerrarModal();
+}
+
+// FASE 2: Generar tarjetas de adicionales
+function irAFase2() {
+  wizardCantidad = parseInt(document.getElementById("wizard-cantidad").value);
+
+  // Inicializar configuraciones vacías
+  wizardConfiguraciones = [];
+  for (let i = 0; i < wizardCantidad; i++) {
+    wizardConfiguraciones.push({
+      adicionales: adicionalesDisponibles.map((adicional) => ({
+        id: adicional.id,
+        nombre: adicional.nombre,
+        precio: adicional.precio,
+        seleccionado: false,
+      })),
+    });
+  }
+
+  // Generar HTML de personalización
+  const container = document.getElementById("productos-personalizar");
+  container.innerHTML = "";
+
+  for (let i = 0; i < wizardCantidad; i++) {
+    const div = document.createElement("div");
+    div.className = "producto-personalizar";
+
+    let adicionalesHTML = "";
+    if (adicionalesDisponibles.length === 0) {
+      adicionalesHTML = `
+        <div class="ingrediente-item">
+          <p class="wizard-empty">No hay adicionales disponibles.</p>
+        </div>
+      `;
+    } else {
+      adicionalesDisponibles.forEach((adicional) => {
+        adicionalesHTML += `
+          <div class="ingrediente-item">
+            <label>
+              <input
+                type="checkbox"
+                class="ingrediente-checkbox"
+                data-producto="${i}"
+                data-adicional="${adicional.id}"
+                onchange="toggleAdicionalWizard(${i}, ${adicional.id}, this.checked)"
+              />
+              <span>${adicional.nombre}</span>
+              <span class="adicional-precio">+ $${adicional.precio.toLocaleString("es-CO")}</span>
+            </label>
+          </div>
+        `;
+      });
+    }
+
+    div.innerHTML = `
+      <div class="producto-header">
+        <span class="producto-icono">🍕</span>
+        <span class="producto-numero">#${i + 1}</span>
+      </div>
+      <div class="producto-ingredientes">
+        ${adicionalesHTML}
+      </div>
+    `;
+
+    container.appendChild(div);
+  }
+
+  mostrarFase(2);
+}
+
+function toggleAdicionalWizard(productoIndex, adicionalId, seleccionado) {
+  const configuracion = wizardConfiguraciones[productoIndex];
+  if (!configuracion) return;
+
+  const adicional = configuracion.adicionales.find(
+    (item) => item.id === adicionalId,
+  );
+  if (adicional) {
+    adicional.seleccionado = seleccionado;
+  }
+}
+
+// FASE 3: Mostrar resumen
+function irAFase3() {
+  const container = document.getElementById("resumen-final");
+
+  let resumenHTML = '<div class="resumen-items">';
+  let total = 0;
+
+  wizardConfiguraciones.forEach((config, i) => {
+    const adicionalesSeleccionados = config.adicionales.filter(
+      (adicional) => adicional.seleccionado,
+    );
+    const extrasTotal = adicionalesSeleccionados.reduce(
+      (sum, adicional) => sum + adicional.precio,
+      0,
+    );
+    const precio = productoActual.precioBase + extrasTotal;
+    total += precio;
+
+    let detalles = "✅ Sin adicionales";
+    if (adicionalesSeleccionados.length > 0) {
+      detalles = `➕ Con: ${adicionalesSeleccionados.map((item) => item.nombre).join(", ")}`;
+    }
+
+    const tieneAdicionales = adicionalesSeleccionados.length > 0;
+
+    resumenHTML += `
+      <div class="resumen-item-final ${tieneAdicionales ? "con-adicionales" : ""}">
+        <div class="resumen-item-info">
+          <div class="resumen-item-cantidad">🍕 #${i + 1}</div>
+          <div class="resumen-item-detalles">${detalles}</div>
+        </div>
+        <div class="resumen-item-precio">$${precio.toLocaleString("es-CO")}</div>
+      </div>
+    `;
+  });
+
+  resumenHTML += "</div>";
+
+  resumenHTML += `
+    <div class="resumen-total">
+      <div class="resumen-total-label">Total ${wizardCantidad} producto${wizardCantidad > 1 ? "s" : ""}</div>
+      <div class="resumen-total-precio">$${total.toLocaleString("es-CO")}</div>
+    </div>
+  `;
+
+  container.innerHTML = resumenHTML;
+  mostrarFase(3);
+}
+
+function volverAFase2() {
+  mostrarFase(2);
+}
+
+function confirmarPedidoWizard() {
+  if (!productoActual) return;
+
+  // Agregar cada configuración al carrito
+  wizardConfiguraciones.forEach((config) => {
+    const adicionalesSeleccionados = config.adicionales.filter(
+      (adicional) => adicional.seleccionado,
+    );
+    const extrasTotal = adicionalesSeleccionados.reduce(
+      (sum, adicional) => sum + adicional.precio,
+      0,
+    );
+    const precioFinal = productoActual.precioBase + extrasTotal;
+    const adicionalesNombres = adicionalesSeleccionados.map(
+      (item) => item.nombre,
+    );
+
+    const item = {
+      id: Date.now() + Math.random(),
+      nombre: productoActual.nombreMostrar,
+      nombreBase: productoActual.nombre,
+      sizeLabel: productoActual.sizeLabel,
+      descripcion: productoActual.descripcion,
+      precioBase: productoActual.precioBase,
+      precio: precioFinal,
+      cantidad: 1,
+      adicionales: adicionalesNombres,
+      adicionalesDetalle: adicionalesSeleccionados,
+      subtotal: precioFinal,
+      categoria: productoActual.categoria,
+    };
+
+    carrito.push(item);
+  });
+
+  guardarCarritoEnLocalStorage();
+  actualizarCarritoUI();
+  cerrarModal();
+
+  mostrarNotificacion(
+    `✅ ${wizardCantidad} producto${wizardCantidad > 1 ? "s" : ""} agregado${wizardCantidad > 1 ? "s" : ""} al carrito`,
+    "success",
+  );
+
+  // Abrir carrito automáticamente
+  setTimeout(() => {
+    toggleCarrito();
+  }, 400);
+}
+
+// === CARRITO ===
+
+function actualizarCarritoUI() {
+  const carritoItems = document.getElementById("carrito-items");
+  const cartCount = document.getElementById("cart-count");
+  const cartBadgeTop = document.getElementById("cart-badge-top");
+  const cartFixedBtn = document.getElementById("cart-fixed-btn");
+  const carritoTotal = document.getElementById("carrito-total");
+
+  // Actualizar contador
+  const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+
+  // Actualizar contador del hero
+  cartCount.textContent = totalItems;
+  if (totalItems > 0) {
+    cartCount.style.display = "flex";
+  } else {
+    cartCount.style.display = "none";
+  }
+
+  // Actualizar botón fijo superior
+  if (cartBadgeTop) {
+    cartBadgeTop.textContent = totalItems;
+  }
+
+  if (cartFixedBtn) {
+    if (totalItems > 0) {
+      cartFixedBtn.classList.add("visible");
+    } else {
+      cartFixedBtn.classList.remove("visible");
+    }
+  }
+
+  // Actualizar items
+  if (carrito.length === 0) {
+    carritoItems.innerHTML = `
+      <div class="carrito-empty">
+        <p>Tu carrito está vacío</p>
+        <p class="carrito-empty-subtitle">Agrega productos para comenzar</p>
+      </div>
+    `;
+    carritoTotal.textContent = "$0";
+    return;
+  }
+
+  carritoItems.innerHTML = "";
+  let total = 0;
+
+  // Agrupar productos por nombre para detectar múltiples configuraciones
+  const productosAgrupados = {};
+  carrito.forEach((item) => {
+    if (!productosAgrupados[item.nombre]) {
+      productosAgrupados[item.nombre] = [];
+    }
+    productosAgrupados[item.nombre].push(item);
+  });
+
+  carrito.forEach((item) => {
+    total += item.subtotal;
+
+    const div = document.createElement("div");
+    div.className = "carrito-item";
+
+    // Verificar si hay múltiples configuraciones del mismo producto
+    const configuraciones = productosAgrupados[item.nombre];
+    const numeroConfiguracion =
+      configuraciones.findIndex((p) => p.id === item.id) + 1;
+    const hayMultiplesConfigs = configuraciones.length > 1;
+
+    let configBadge = "";
+    if (hayMultiplesConfigs) {
+      configBadge = `<span class="config-badge">Config ${numeroConfiguracion}/${configuraciones.length}</span>`;
+    }
+
+    let modificaciones = "";
+    if (item.adicionales && item.adicionales.length > 0) {
+      modificaciones = `<div class="carrito-adicionales">➕ Con: ${item.adicionales.join(", ")}</div>`;
+    } else {
+      modificaciones = `<div class="carrito-adicionales">✅ Sin adicionales</div>`;
+    }
+
+    div.innerHTML = `
+      <div class="carrito-item-header">
+        <div class="carrito-item-name">
+          ${item.nombre}
+          ${configBadge}
+        </div>
+        <div class="carrito-item-actions">
+          <button class="carrito-item-duplicate" onclick="duplicarProducto(${item.id})" title="Duplicar esta configuración">📋</button>
+          <button class="carrito-item-edit" onclick="editarProducto(${item.id})" title="Editar esta configuración">✏️</button>
+          <button class="carrito-item-remove" onclick="eliminarDelCarrito(${item.id})" title="Eliminar esta configuración">×</button>
+        </div>
+      </div>
+      <div class="carrito-item-details">${modificaciones}</div>
+      <div class="carrito-item-footer">
+        <div class="carrito-item-qty">🔢 Cantidad: ${item.cantidad}</div>
+        <div class="carrito-item-price">$${item.subtotal.toLocaleString("es-CO")}</div>
+      </div>
+    `;
+
+    carritoItems.appendChild(div);
+  });
+
+  carritoTotal.textContent = `$${total.toLocaleString("es-CO")}`;
+}
+
+function eliminarDelCarrito(id) {
+  carrito = carrito.filter((item) => item.id !== id);
+  guardarCarritoEnLocalStorage();
+  actualizarCarritoUI();
+  mostrarNotificacion("Producto eliminado del carrito", "warning");
+}
+
+function duplicarProducto(id) {
+  const itemOriginal = carrito.find((item) => item.id === id);
+  if (!itemOriginal) return;
+
+  // Crear copia del producto con nuevo ID
+  const itemDuplicado = {
+    ...itemOriginal,
+    id: Date.now(), // Nuevo ID único
+  };
+
+  carrito.push(itemDuplicado);
+  guardarCarritoEnLocalStorage();
+  actualizarCarritoUI();
+  mostrarNotificacion("Producto duplicado en el carrito", "info");
+}
+
+function vaciarCarrito() {
+  if (carrito.length === 0) return;
+
+  if (confirm("¿Estás seguro de que quieres vaciar el carrito?")) {
+    carrito = [];
+    guardarCarritoEnLocalStorage();
+    actualizarCarritoUI();
+    mostrarNotificacion("Carrito vaciado", "warning");
+  }
+}
+
+function toggleCarrito() {
+  const sidebar = document.getElementById("carrito-sidebar");
+  const overlay = document.getElementById("overlay");
+
+  sidebar.classList.toggle("active");
+  overlay.classList.toggle("active");
+
+  if (sidebar.classList.contains("active")) {
+    document.body.style.overflow = "hidden";
+  } else {
+    document.body.style.overflow = "auto";
+  }
+}
+
+// Función para seguir explorando productos
+function seguirExplorando() {
+  // Cerrar el carrito
+  toggleCarrito();
+
+  // Hacer scroll hacia la sección de filtros después de un pequeño delay
+  setTimeout(() => {
+    const searchSection = document.querySelector(".search-filter-section");
+    if (searchSection) {
+      searchSection.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, 300);
+}
+
+// === CARD DE PEDIDO ===
+
+// Variables globales para el pedido
+let tipoPedidoSeleccionado = null;
+let metodoPagoSeleccionado = null;
+
+// Mostrar card de pedido
+function mostrarCardPedido() {
+  if (carrito.length === 0) {
+    alert("Tu carrito está vacío. Agrega productos antes de hacer el pedido.");
+    return;
+  }
+
+  // Resetear formulario
+  tipoPedidoSeleccionado = null;
+  metodoPagoSeleccionado = null;
+  document.getElementById("cliente-nombre").value = "";
+  document.getElementById("cliente-direccion").value = "";
+  document.getElementById("cliente-barrio").value = "";
+  document.getElementById("cliente-especificaciones").value = "";
+
+  // Ocultar campos de domicilio inicialmente
+  document.getElementById("campos-domicilio").style.display = "none";
+
+  // Remover clases activas de opciones de tipo de pedido y método de pago
+  document.querySelectorAll(".tipo-option").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+
+  // Ocultar mensaje de validación
+  document.getElementById("validacion-mensaje").style.display = "none";
+
+  // Mostrar card
+  document.getElementById("pedido-card").classList.add("active");
+}
+
+// Cerrar card de pedido
+function cerrarCardPedido() {
+  document.getElementById("pedido-card").classList.remove("active");
+}
+
+// Seleccionar tipo de pedido
+function seleccionarTipoPedido(tipo) {
+  tipoPedidoSeleccionado = tipo;
+
+  // Remover clase active de todas las opciones de tipo de pedido (no de método de pago)
+  document
+    .querySelectorAll(".tipo-option:not(.metodo-pago-option)")
+    .forEach((btn) => {
+      btn.classList.remove("active");
+    });
+
+  // Agregar clase active al botón seleccionado
+  event.target.classList.add("active");
+
+  // Mostrar/ocultar campos de domicilio
+  const camposDomicilio = document.getElementById("campos-domicilio");
+  if (tipo === "domicilio") {
+    camposDomicilio.style.display = "block";
+  } else {
+    camposDomicilio.style.display = "none";
+  }
+
+  // Ocultar mensaje de validación
+  document.getElementById("validacion-mensaje").style.display = "none";
+}
+
+// Seleccionar método de pago
+function seleccionarMetodoPago(metodo) {
+  metodoPagoSeleccionado = metodo;
+
+  // Remover clase active de todas las opciones de método de pago
+  document.querySelectorAll(".metodo-pago-option").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+
+  // Agregar clase active al botón seleccionado
+  event.target.classList.add("active");
+
+  // Ocultar mensaje de validación
+  document.getElementById("validacion-mensaje").style.display = "none";
+}
+
+// Validar formulario
+function validarFormulario() {
+  const nombre = document.getElementById("cliente-nombre").value.trim();
+  const validacionMensaje = document.getElementById("validacion-mensaje");
+
+  // Ocultar mensaje anterior
+  validacionMensaje.style.display = "none";
+  validacionMensaje.className = "validacion-mensaje";
+
+  // Validar tipo de pedido
+  if (!tipoPedidoSeleccionado) {
+    mostrarMensajeValidacion(
+      "Por favor selecciona un tipo de pedido.",
+      "error",
+    );
+    return false;
+  }
+
+  // Validar método de pago
+  if (!metodoPagoSeleccionado) {
+    mostrarMensajeValidacion(
+      "Por favor selecciona un método de pago.",
+      "error",
+    );
+    return false;
+  }
+
+  // Validar nombre
+  if (!nombre) {
+    mostrarMensajeValidacion("Por favor ingresa tu nombre completo.", "error");
+    return false;
+  }
+
+  // Validar campos de domicilio si es seleccionado
+  if (tipoPedidoSeleccionado === "domicilio") {
+    const direccion = document.getElementById("cliente-direccion").value.trim();
+    const barrio = document.getElementById("cliente-barrio").value.trim();
+
+    if (!direccion) {
+      mostrarMensajeValidacion(
+        "Por favor ingresa tu dirección completa.",
+        "error",
+      );
+      return false;
+    }
+
+    if (!barrio) {
+      mostrarMensajeValidacion(
+        "Por favor ingresa tu barrio o sector.",
+        "error",
+      );
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Mostrar mensaje de validación
+function mostrarMensajeValidacion(mensaje, tipo) {
+  const validacionMensaje = document.getElementById("validacion-mensaje");
+  validacionMensaje.textContent = mensaje;
+  validacionMensaje.classList.add(tipo);
+  validacionMensaje.style.display = "block";
+}
+
+// === WHATSAPP ===
+function enviarPedidoWhatsApp() {
+  // Validar formulario
+  if (!validarFormulario()) {
+    return;
+  }
+
+  // Obtener datos del formulario
+  const nombre = document.getElementById("cliente-nombre").value.trim();
+  const direccion = document.getElementById("cliente-direccion").value.trim();
+  const barrio = document.getElementById("cliente-barrio").value.trim();
+  const especificaciones = document
+    .getElementById("cliente-especificaciones")
+    .value.trim();
+
+  // Obtener saludo según la hora
+  const ahora = new Date();
+  const hora = ahora.getHours();
+
+  let saludo = "Buenas tardes";
+  if (hora >= 19) {
+    saludo = "Buenas noches";
+  } else if (hora < 12) {
+    saludo = "Buenos días";
+  }
+
+  // Construir mensaje con información del cliente
+  let mensaje = `Hola 👋 ${saludo}.\n\n`;
+  mensaje += `Soy *${nombre}* y quisiera realizar el siguiente pedido en *Pizzería La 105* 🍕:\n\n`;
+
+  // Función para obtener el nombre del tipo de producto
+  const obtenerTipoProducto = (categoria) => {
+    const tipos = {
+      "pizzas-especiales": "pizzas",
+      "pizzas-tradicionales": "pizzas",
+      pizzetas: "pizzetas",
+      panzerottis: "panzerottis",
+      adicionales: "adicionales",
+    };
+    return tipos[categoria] || "productos";
+  };
+
+  // Agrupar productos por nombre
+  const productosAgrupados = {};
+  carrito.forEach((item) => {
+    if (!productosAgrupados[item.nombre]) {
+      productosAgrupados[item.nombre] = {
+        precio: item.precio,
+        categoria: item.categoria,
+        variaciones: {},
+        totalCantidad: 0,
+        subtotalGeneral: 0,
+      };
+    }
+
+    // Crear clave para la variación (adicionales)
+    const extras = item.adicionales || [];
+    const claveVariacion =
+      extras.length > 0 ? extras.slice().sort().join(", ") : "sin-adicionales";
+
+    if (!productosAgrupados[item.nombre].variaciones[claveVariacion]) {
+      productosAgrupados[item.nombre].variaciones[claveVariacion] = {
+        cantidad: 0,
+        adicionales: extras,
+      };
+    }
+
+    productosAgrupados[item.nombre].variaciones[claveVariacion].cantidad +=
+      item.cantidad;
+    productosAgrupados[item.nombre].totalCantidad += item.cantidad;
+    productosAgrupados[item.nombre].subtotalGeneral += item.subtotal;
+  });
+
+  // Construir mensaje con productos agrupados
+  Object.keys(productosAgrupados).forEach((nombreProducto) => {
+    const producto = productosAgrupados[nombreProducto];
+    const tipoProducto = obtenerTipoProducto(producto.categoria);
+    const tipoProductoSingular =
+      producto.categoria === "pizzas-especiales"
+        ? "pizza"
+        : producto.categoria === "pizzas-tradicionales"
+          ? "pizza"
+          : producto.categoria === "pizzetas"
+            ? "pizzeta"
+            : producto.categoria === "panzerottis"
+              ? "panzerotti"
+              : producto.categoria === "adicionales"
+                ? "adicional"
+                : "producto";
+
+    mensaje += `📌 *${nombreProducto}:* ${producto.totalCantidad} ${producto.totalCantidad > 1 ? tipoProducto : tipoProductoSingular}\n`;
+    mensaje += `💲 *Precio unitario:* $${producto.precio.toLocaleString("es-CO")}\n`;
+
+    // Mostrar variaciones
+    const variaciones = producto.variaciones;
+    mensaje += `Especificación del pedido:\n`;
+
+    Object.keys(variaciones).forEach((claveVariacion) => {
+      const variacion = variaciones[claveVariacion];
+      if (claveVariacion === "sin-adicionales") {
+        mensaje += `   • ${variacion.cantidad} ${tipoProductoSingular} ${nombreProducto} sin adicionales${variacion.cantidad > 1 ? "es" : ""}\n`;
+      } else {
+        mensaje += `   • ${variacion.cantidad} ${tipoProductoSingular} ${nombreProducto} con ${variacion.adicionales.join(", ")}\n`;
+      }
+    });
+
+    mensaje += `🧾 *Subtotal:* $${producto.subtotalGeneral.toLocaleString("es-CO")}\n\n`;
+  });
+
+  const total = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+  mensaje += `💰 *Total a pagar:* $${total.toLocaleString("es-CO")}\n\n`;
+
+  // Tipo de pedido
+  switch (tipoPedidoSeleccionado) {
+    case "recoger":
+      mensaje += `🏪 *Tipo de pedido:* El pedido es para pasar a recoger en el local.\n\n`;
+      break;
+    case "domicilio":
+      mensaje += `🏠 *Tipo de pedido:* El pedido es para envío a domicilio.\n`;
+      mensaje += `📍 *Dirección:* ${direccion}\n`;
+      mensaje += `🏘️ *Barrio:* ${barrio}\n`;
+      if (especificaciones) {
+        mensaje += `📝 *Especificaciones:* ${especificaciones}\n`;
+      }
+      mensaje += `\n`;
+      break;
+    case "local":
+      mensaje += `🍽️ *Tipo de pedido:* El pedido es para consumir en el establecimiento.\n\n`;
+      break;
+  }
+
+  // Método de pago
+  const metodoPagoTexto = {
+    nequi: "Nequi",
+    llave: "Llave",
+    efectivo: "Efectivo",
+  };
+  mensaje += `💳 *Método de pago:* ${metodoPagoTexto[metodoPagoSeleccionado]}\n\n`;
+
+  mensaje += `¡Muchas gracias!\n\n`;
+
+  // Aviso automático
+  mensaje += `ℹ️ Aviso automático de Pizzería La 105:\nSi su pedido no es confirmado en un lapso de 10 minutos, intente más tarde debido a la alta demanda de pedidos.`;
+
+  // Codificar y abrir WhatsApp
+  const mensajeCodificado = encodeURIComponent(mensaje);
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${mensajeCodificado}`;
+
+  // Cerrar card y abrir WhatsApp
+  cerrarCardPedido();
+  window.open(url, "_blank");
+
+  // Mostrar mensaje de éxito
+  mostrarMensajeValidacion(
+    "¡Pedido enviado exitosamente! Te contactaremos pronto.",
+    "success",
+  );
+  setTimeout(() => {
+    document.getElementById("validacion-mensaje").style.display = "none";
+  }, 3000);
+}
+
+// Variables globales para edición
+let productoEditando = null;
+let adicionalesEditando = [];
+
+// === EDICIÓN DE PRODUCTOS ===
+function editarProducto(id) {
+  const item = carrito.find((item) => item.id === id);
+  if (!item) return;
+
+  productoEditando = { ...item };
+
+  // Llenar modal de edición
+  document.getElementById("edit-modal-nombre").textContent =
+    `Editar ${item.nombre}`;
+  document.getElementById("edit-modal-precio").textContent =
+    `$${item.precio.toLocaleString("es-CO")}`;
+  document.getElementById("edit-modal-descripcion").textContent =
+    item.descripcion || "";
+  document.getElementById("edit-modal-cantidad").value = item.cantidad;
+
+  // Generar lista de adicionales para edición
+  generarAdicionalesEdicion(item);
+
+  // Calcular subtotal inicial
+  actualizarEditSubtotal();
+
+  // Mostrar modal
+  document.getElementById("edit-modal").classList.add("active");
+}
+
+function generarAdicionalesEdicion(item) {
+  const container = document.getElementById("edit-modal-ingredientes");
+  container.innerHTML = "";
+
+  const adicionales = obtenerAdicionalesDisponibles();
+  const seleccionados = new Set(item.adicionales || []);
+
+  adicionalesEditando = [];
+
+  if (adicionales.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "wizard-empty";
+    empty.textContent = "No hay adicionales disponibles.";
+    container.appendChild(empty);
+    return;
+  }
+
+  adicionales.forEach((adicional, index) => {
+    const div = document.createElement("div");
+    div.className = "ingrediente-item";
+
+    const label = document.createElement("label");
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "12px";
+    label.style.cursor = "pointer";
+    label.style.flex = "1";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "ingrediente-checkbox";
+    checkbox.id = `edit-adicional-${index}`;
+    checkbox.checked = seleccionados.has(adicional.nombre);
+
+    const span = document.createElement("span");
+    span.textContent = adicional.nombre;
+    span.style.flex = "1";
+
+    const precio = document.createElement("span");
+    precio.className = "adicional-precio";
+    precio.textContent = `+ $${adicional.precio.toLocaleString("es-CO")}`;
+
+    label.appendChild(checkbox);
+    label.appendChild(span);
+    label.appendChild(precio);
+    div.appendChild(label);
+    container.appendChild(div);
+
+    adicionalesEditando.push({
+      id: adicional.id,
+      nombre: adicional.nombre,
+      precio: adicional.precio,
+      seleccionado: checkbox.checked,
+    });
+
+    checkbox.addEventListener("change", function () {
+      adicionalesEditando[index].seleccionado = this.checked;
+      actualizarEditSubtotal();
+    });
+  });
+}
+
+function cambiarEditCantidad(cambio) {
+  const input = document.getElementById("edit-modal-cantidad");
+  let cantidad = parseInt(input.value);
+  cantidad += cambio;
+
+  if (cantidad < 1) cantidad = 1;
+  if (cantidad > 10) cantidad = 10;
+
+  input.value = cantidad;
+  actualizarEditSubtotal();
+}
+
+function actualizarEditSubtotal() {
+  if (!productoEditando) return;
+
+  const cantidad = parseInt(
+    document.getElementById("edit-modal-cantidad").value,
+  );
+  const base = productoEditando.precioBase || productoEditando.precio;
+  const extrasTotal = adicionalesEditando
+    .filter((item) => item.seleccionado)
+    .reduce((sum, item) => sum + item.precio, 0);
+  const subtotal = (base + extrasTotal) * cantidad;
+
+  document.getElementById("edit-modal-subtotal").textContent =
+    `$${subtotal.toLocaleString("es-CO")}`;
+}
+
+function guardarEdicionProducto() {
+  if (!productoEditando) return;
+
+  const cantidad = parseInt(
+    document.getElementById("edit-modal-cantidad").value,
+  );
+
+  const adicionalesSeleccionados = adicionalesEditando
+    .filter((item) => item.seleccionado)
+    .map((item) => item.nombre);
+  const extrasTotal = adicionalesEditando
+    .filter((item) => item.seleccionado)
+    .reduce((sum, item) => sum + item.precio, 0);
+  const base = productoEditando.precioBase || productoEditando.precio;
+  const precioFinal = base + extrasTotal;
+
+  // Verificar si existe otro producto idéntico (excluyendo el que estamos editando)
+  const productoIdentico = carrito.find(
+    (item) =>
+      item.id !== productoEditando.id && // Excluir el producto que estamos editando
+      item.nombre === productoEditando.nombre &&
+      item.precioBase === base &&
+      JSON.stringify((item.adicionales || []).sort()) ===
+        JSON.stringify(adicionalesSeleccionados.sort()),
+  );
+
+  // Actualizar el producto editado
+  const index = carrito.findIndex((item) => item.id === productoEditando.id);
+  if (index !== -1) {
+    if (productoIdentico) {
+      // Si existe idéntico, combinar cantidades y eliminar el producto editado
+      productoIdentico.cantidad += cantidad;
+      productoIdentico.subtotal =
+        productoIdentico.precio * productoIdentico.cantidad;
+      carrito.splice(index, 1); // Eliminar el producto editado
+      mostrarNotificacion(
+        "Productos combinados por configuración idéntica",
+        "info",
+      );
+    } else {
+      // Si no existe idéntico, actualizar normalmente
+      carrito[index].cantidad = cantidad;
+      carrito[index].adicionales = adicionalesSeleccionados;
+      carrito[index].precioBase = base;
+      carrito[index].precio = precioFinal;
+      carrito[index].subtotal = precioFinal * cantidad;
+      mostrarNotificacion("Producto actualizado", "success");
+    }
+
+    guardarCarritoEnLocalStorage();
+    actualizarCarritoUI();
+    cerrarEditModal();
+  }
+}
+
+function cerrarEditModal() {
+  document.getElementById("edit-modal").classList.remove("active");
+  productoEditando = null;
+  adicionalesEditando = [];
+}
+
+function cancelarEdicion() {
+  // Resetear los cambios sin guardar
+  cerrarEditModal();
+  mostrarNotificacion("Cambios descartados", "info");
+}
+function guardarCarritoEnLocalStorage() {
+  localStorage.setItem("la105-pizzeria-carrito", JSON.stringify(carrito));
+}
+
+function cargarCarritoDesdeLocalStorage() {
+  // Vaciar carrito al recargar la página
+  carrito = [];
+  localStorage.removeItem("la105-pizzeria-carrito");
+  actualizarCarritoUI();
+}
+
+// === NOTIFICACIONES MEJORADAS ===
+function mostrarNotificacion(mensaje, tipo = "success") {
+  const estilos = {
+    success: {
+      background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)",
+      icon: "✅",
+    },
+    info: {
+      background: "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)",
+      icon: "ℹ️",
+    },
+    warning: {
+      background: "linear-gradient(135deg, #FFA726 0%, #FB8C00 100%)",
+      icon: "⚠️",
+    },
+  };
+
+  const estilo = estilos[tipo] || estilos.success;
+  const duracionAnim = esMobile ? "0.2s" : "0.4s";
+  const tiempoVisible = esMobile ? 2500 : 3500;
+
+  const notif = document.createElement("div");
+  notif.innerHTML = `<span style="margin-right: 8px;">${estilo.icon}</span>${mensaje}`;
+  notif.style.cssText = `
+    position: fixed;
+    top: ${esMobile ? "80px" : "100px"};
+    right: ${esMobile ? "10px" : "20px"};
+    left: ${esMobile ? "10px" : "auto"};
+    background: ${estilo.background};
+    color: white;
+    padding: ${esMobile ? "12px 16px" : "16px 24px"};
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    font-weight: 600;
+    font-size: ${esMobile ? "14px" : "16px"};
+    animation: slideInRight ${duracionAnim} ease-out;
+    max-width: ${esMobile ? "none" : "350px"};
+    line-height: 1.4;
+    transform: translateZ(0);
+  `;
+
+  document.body.appendChild(notif);
+
+  setTimeout(() => {
+    notif.style.animation = `slideOutRight ${duracionAnim} ease-out`;
+    setTimeout(
+      () => {
+        if (notif.parentNode) {
+          document.body.removeChild(notif);
+        }
+      },
+      esMobile ? 200 : 400,
+    );
+  }, tiempoVisible);
+}
+
+// === ANIMACIONES SCROLL ===
+function animarElementos() {
+  // Verificar soporte de IntersectionObserver
+  if (!("IntersectionObserver" in window)) return;
+
+  // En móvil, reducir animaciones para mejor rendimiento
+  const observerOptions = {
+    threshold: esMobile ? 0.05 : 0.1,
+    rootMargin: esMobile ? "0px" : "0px 0px -50px 0px",
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        requestAnimationFrame(() => {
+          // Animación más rápida en móvil
+          entry.target.style.animation = esMobile
+            ? "fadeInUp 0.3s ease-out"
+            : "fadeInUp 0.5s ease-out";
+        });
+        observer.unobserve(entry.target);
+      }
+    });
+  }, observerOptions);
+
+  document.querySelectorAll(".menu-section").forEach((section) => {
+    observer.observe(section);
+  });
+}
+
+// === CERRAR CON ESC ===
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") {
+    cerrarModal();
+    const sidebar = document.getElementById("carrito-sidebar");
+    if (sidebar.classList.contains("active")) {
+      toggleCarrito();
+    }
+    // Cerrar menú flotante también
+    const menu = document.getElementById("floating-menu");
+    if (menu && menu.classList.contains("active")) {
+      toggleFloatingMenu();
+    }
+  }
+});
+
+// === CERRAR OVERLAY ===
+document.getElementById("overlay").addEventListener("click", function () {
+  cerrarModal();
+  const sidebar = document.getElementById("carrito-sidebar");
+  if (sidebar.classList.contains("active")) {
+    toggleCarrito();
+  }
+});
+
+// === ANIMACIÓN DE ENTRADA CSS ===
+const style = document.createElement("style");
+style.textContent = `
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes slideOutRight {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+  }
+`;
+document.head.appendChild(style);
+
+/* ============================================
+   BOTÓN FLOTANTE DE NAVEGACIÓN
+   ============================================ */
+
+// Mostrar/ocultar botón flotante al hacer scroll (optimizado con throttle)
+const manejarScrollFloatingBtn = throttle(function () {
+  const floatingBtn = document.getElementById("floating-nav-btn");
+  const navbar = document.querySelector(".navbar");
+
+  if (!floatingBtn || !navbar) return;
+
+  // Obtener la posición del navbar
+  const navbarBottom = navbar.offsetTop + navbar.offsetHeight;
+
+  // Mostrar botón cuando el navbar ya no es visible
+  if (window.scrollY > navbarBottom + 100) {
+    floatingBtn.classList.add("visible");
+  } else {
+    floatingBtn.classList.remove("visible");
+  }
+}, 100);
+
+window.addEventListener("scroll", manejarScrollFloatingBtn, { passive: true });
+
+// Toggle del menú flotante
+function toggleFloatingMenu() {
+  const menu = document.getElementById("floating-menu");
+  const overlay = document.getElementById("floating-overlay");
+  const btn = document.getElementById("floating-nav-btn");
+
+  if (!menu || !overlay) return;
+
+  const isActive = menu.classList.contains("active");
+
+  if (isActive) {
+    // Cerrar
+    menu.classList.remove("active");
+    overlay.classList.remove("active");
+    btn.style.transform = "scale(1)";
+  } else {
+    // Abrir
+    menu.classList.add("active");
+    overlay.classList.add("active");
+    btn.style.transform = "scale(0.9)";
+  }
+}
+
+// Navegar a sección y cerrar menú (soluciona problema de primer clic)
+function navegarASeccion(seccionId, event) {
+  // Prevenir comportamiento por defecto del enlace
+  if (event) {
+    event.preventDefault();
+  }
+
+  // Cerrar el menú primero
+  const menu = document.getElementById("floating-menu");
+  const overlay = document.getElementById("floating-overlay");
+  const btn = document.getElementById("floating-nav-btn");
+
+  if (menu) menu.classList.remove("active");
+  if (overlay) overlay.classList.remove("active");
+  if (btn) btn.style.transform = "scale(1)";
+
+  // Navegar a la sección después de un pequeño delay para asegurar que el menú se cerró
+  requestAnimationFrame(() => {
+    const seccion = document.getElementById(seccionId);
+    if (seccion) {
+      const navbarHeight =
+        document.querySelector(".navbar")?.offsetHeight || 60;
+      const offsetTop = seccion.offsetTop - navbarHeight - 10;
+
+      // Usar scroll nativo en móvil para mejor rendimiento
+      if (esMobile) {
+        window.scrollTo(0, offsetTop);
+      } else {
+        window.scrollTo({
+          top: offsetTop,
+          behavior: "smooth",
+        });
+      }
+
+      // Actualizar el hash en la URL sin causar scroll adicional
+      history.pushState(null, null, "#" + seccionId);
+    }
+  });
+}
+
+// Vaciar carrito al recargar o cerrar la página
+window.addEventListener("beforeunload", function () {
+  localStorage.removeItem("la105-pizzeria-carrito");
+});
+
+// También vaciar al cargar
+window.addEventListener("load", function () {
+  carrito = [];
+  localStorage.removeItem("la105-pizzeria-carrito");
+  actualizarCarritoUI();
+});
+
+// Logs desactivados en producción para mejor rendimiento
+// Para debug, descomentar las siguientes líneas:
+// console.log("🍕 Pizzería La 105 - Sistema cargado correctamente");
+// console.log("📱 WhatsApp: modifica WHATSAPP_NUMBER en script.js");

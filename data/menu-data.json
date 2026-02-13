@@ -1,0 +1,489 @@
+{
+  "config": {
+    "nombreRestaurante": "Pizzería La 105",
+    "slogan": "Calle 105 #16-19, El Rocio",
+    "whatsapp": "573204132725",
+    "telefono": "320 413 2725",
+    "horario": "",
+    "diaCerrado": "",
+    "desarrolladoPor": ""
+  },
+  "categorias": [
+    {
+      "id": "pizzas-especiales",
+      "nombre": "Especialidades de la casa",
+      "emoji": "🍕",
+      "icono": "",
+      "subtitulo": "Masa artesanal, queso fundido y sabor generoso",
+      "orden": 1,
+      "visible": true
+    },
+    {
+      "id": "pizzas-tradicionales",
+      "nombre": "Clasicas del barrio",
+      "emoji": "🍕",
+      "icono": "",
+      "subtitulo": "Porcion $7.000 | Rueda $70.000",
+      "orden": 2,
+      "visible": true
+    },
+    {
+      "id": "pizzetas",
+      "nombre": "Pizzetas al centro",
+      "emoji": "📏",
+      "icono": "",
+      "subtitulo": "Para compartir sin afan",
+      "orden": 3,
+      "visible": true
+    },
+    {
+      "id": "panzerottis",
+      "nombre": "Panzerottis al horno",
+      "emoji": "🥟",
+      "icono": "",
+      "subtitulo": "Horneado lento, 30 minutos de espera",
+      "orden": 4,
+      "visible": true
+    },
+    {
+      "id": "adicionales",
+      "nombre": "Adicionales de mesa",
+      "emoji": "➕",
+      "icono": "",
+      "subtitulo": "Cada adicional $5.000",
+      "orden": 5,
+      "visible": true
+    }
+  ],
+  "productos": [
+    {
+      "id": 1,
+      "nombre": "Choripizza",
+      "descripcion": "Porción. Maíz, chorizo, cabano, carne desmechada, pollo desmechado y huevo de codorniz.",
+      "precio": 7500,
+      "categoria": "pizzas-especiales",
+      "badge": null,
+      "orden": 1,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 2,
+      "nombre": "Choripizza",
+      "descripcion": "Rueda. Maíz, chorizo, cabano, carne desmechada, pollo desmechado y huevo de codorniz.",
+      "precio": 75000,
+      "categoria": "pizzas-especiales",
+      "badge": null,
+      "orden": 2,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 3,
+      "nombre": "Mixta",
+      "descripcion": "Porción. Tocineta, carne molida, maíz, pollo desmechado y chorizo.",
+      "precio": 7500,
+      "categoria": "pizzas-especiales",
+      "badge": null,
+      "orden": 3,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 4,
+      "nombre": "Mixta",
+      "descripcion": "Rueda. Tocineta, carne molida, maíz, pollo desmechado y chorizo.",
+      "precio": 75000,
+      "categoria": "pizzas-especiales",
+      "badge": null,
+      "orden": 4,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 5,
+      "nombre": "Mexicana",
+      "descripcion": "Porción. Picante fuerte, pimentón, tomate, cebolla, carne molida y cabano.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 1,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 6,
+      "nombre": "Mexicana",
+      "descripcion": "Rueda. Picante fuerte, pimentón, tomate, cebolla, carne molida y cabano.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 2,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 7,
+      "nombre": "Ranchera",
+      "descripcion": "Porción. Chorizo, carne molida y cabano.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 3,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 8,
+      "nombre": "Ranchera",
+      "descripcion": "Rueda. Chorizo, carne molida y cabano.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 4,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 9,
+      "nombre": "Campesina",
+      "descripcion": "Porción. Maíz, cabano, salchichón y pollo desmechado.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 5,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 10,
+      "nombre": "Campesina",
+      "descripcion": "Rueda. Maíz, cabano, salchichón y pollo desmechado.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 6,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 11,
+      "nombre": "Madurito",
+      "descripcion": "Porción. Plátano maduro, carne desmechada y cabano.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 7,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 12,
+      "nombre": "Madurito",
+      "descripcion": "Rueda. Plátano maduro, carne desmechada y cabano.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 8,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 13,
+      "nombre": "Pollo Champiñón",
+      "descripcion": "Porción. Pollo desmechado y champiñones.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 9,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 14,
+      "nombre": "Pollo Champiñón",
+      "descripcion": "Rueda. Pollo desmechado y champiñones.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 10,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 15,
+      "nombre": "Hawaiana",
+      "descripcion": "Porción. Piña y jamón.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 11,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 16,
+      "nombre": "Hawaiana",
+      "descripcion": "Rueda. Piña y jamón.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 12,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 17,
+      "nombre": "Pollo Jamón",
+      "descripcion": "Porción. Pollo desmechado y jamón.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 13,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 18,
+      "nombre": "Pollo Jamón",
+      "descripcion": "Rueda. Pollo desmechado y jamón.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 14,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 19,
+      "nombre": "Carnes Frías",
+      "descripcion": "Porción. Cabano y salchichón de pollo.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 15,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 20,
+      "nombre": "Carnes Frías",
+      "descripcion": "Rueda. Cabano y salchichón de pollo.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 16,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 21,
+      "nombre": "Peperonni",
+      "descripcion": "Porción. Peperoni y cabano.",
+      "precio": 7000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 17,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 22,
+      "nombre": "Peperonni",
+      "descripcion": "Rueda. Peperoni y cabano.",
+      "precio": 70000,
+      "categoria": "pizzas-tradicionales",
+      "badge": null,
+      "orden": 18,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 23,
+      "nombre": "Pizzeta Mediana (30 cm)",
+      "descripcion": "Recomendada para 2-3 personas.",
+      "precio": 30000,
+      "categoria": "pizzetas",
+      "badge": null,
+      "orden": 1,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 24,
+      "nombre": "Pizzeta Grande (36 cm)",
+      "descripcion": "Recomendada para 4-5 personas.",
+      "precio": 40000,
+      "categoria": "pizzetas",
+      "badge": null,
+      "orden": 2,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 25,
+      "nombre": "Chori",
+      "descripcion": "Maíz, chorizo, carne desmechada, pollo desmechado y huevo de codorniz.",
+      "precio": 13000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 1,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 26,
+      "nombre": "Mexicano",
+      "descripcion": "Picante fuerte, pimentón, tomate, cebolla, carne molida y cabano.",
+      "precio": 11000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 2,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 27,
+      "nombre": "Madurito",
+      "descripcion": "Plátano maduro, carne desmechada y cabano.",
+      "precio": 11000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 3,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 28,
+      "nombre": "Campesino",
+      "descripcion": "Maíz, cabano y pollo desmechado.",
+      "precio": 11000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 4,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 29,
+      "nombre": "Pollo Champiñón",
+      "descripcion": "Pollo desmechado y champiñones.",
+      "precio": 11000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 5,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 30,
+      "nombre": "Hawaiano",
+      "descripcion": "Piña y jamón.",
+      "precio": 11000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 6,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 31,
+      "nombre": "Mixto",
+      "descripcion": "Pollo desmechado, salchichón de pollo y cabano.",
+      "precio": 9000,
+      "categoria": "panzerottis",
+      "badge": null,
+      "orden": 7,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 32,
+      "nombre": "Queso",
+      "descripcion": "Adicional.",
+      "precio": 5000,
+      "categoria": "adicionales",
+      "badge": null,
+      "orden": 1,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 33,
+      "nombre": "Pollo",
+      "descripcion": "Adicional.",
+      "precio": 5000,
+      "categoria": "adicionales",
+      "badge": null,
+      "orden": 2,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 34,
+      "nombre": "Piña",
+      "descripcion": "Adicional.",
+      "precio": 5000,
+      "categoria": "adicionales",
+      "badge": null,
+      "orden": 3,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 35,
+      "nombre": "Champiñones",
+      "descripcion": "Adicional.",
+      "precio": 5000,
+      "categoria": "adicionales",
+      "badge": null,
+      "orden": 4,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 36,
+      "nombre": "Maíz",
+      "descripcion": "Adicional.",
+      "precio": 5000,
+      "categoria": "adicionales",
+      "badge": null,
+      "orden": 5,
+      "visible": true,
+      "imagen": null
+    },
+    {
+      "id": 37,
+      "nombre": "Verdura",
+      "descripcion": "Adicional.",
+      "precio": 5000,
+      "categoria": "adicionales",
+      "badge": null,
+      "orden": 6,
+      "visible": true,
+      "imagen": null
+    }
+  ],
+  "badges": {
+    "popular": {
+      "texto": "POPULAR",
+      "clase": "popular"
+    },
+    "nuevo": {
+      "texto": "NUEVO",
+      "clase": "nuevo"
+    },
+    "recomendado": {
+      "texto": "⭐ RECOMENDADO",
+      "clase": "recomendado"
+    },
+    "premium": {
+      "texto": "👑 PREMIUM",
+      "clase": "premium-badge"
+    },
+    "picante": {
+      "texto": "🌶️ PICANTE",
+      "clase": "picante"
+    }
+  }
+}
