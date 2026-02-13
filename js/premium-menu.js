@@ -1450,10 +1450,21 @@ function ensureCartPanel() {
     seguirExplorando();
   };
 
+  const getExploreButton = (eventTarget) => {
+    if (!eventTarget) return null;
+    if (eventTarget.closest) {
+      return eventTarget.closest(".cart-explore");
+    }
+    if (eventTarget.parentElement && eventTarget.parentElement.closest) {
+      return eventTarget.parentElement.closest(".cart-explore");
+    }
+    return null;
+  };
+
   panel.addEventListener(
     "click",
     (event) => {
-      if (event.target.closest(".cart-explore")) {
+      if (getExploreButton(event.target)) {
         handleExplore(event);
       }
     },
@@ -1463,7 +1474,7 @@ function ensureCartPanel() {
   panel.addEventListener(
     "touchend",
     (event) => {
-      if (event.target.closest(".cart-explore")) {
+      if (getExploreButton(event.target)) {
         handleExplore(event);
       }
     },
