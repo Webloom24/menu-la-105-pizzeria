@@ -1442,9 +1442,17 @@ function ensureCartPanel() {
   }
   const exploreBtn = panel.querySelector(".cart-explore");
   if (exploreBtn) {
-    exploreBtn.addEventListener("click", () => {
+    let lastExploreTrigger = 0;
+    const handleExplore = (event) => {
+      const now = Date.now();
+      if (now - lastExploreTrigger < 350) return;
+      lastExploreTrigger = now;
+      event.preventDefault();
+      event.stopPropagation();
       seguirExplorando();
-    });
+    };
+    exploreBtn.addEventListener("pointerup", handleExplore);
+    exploreBtn.addEventListener("click", handleExplore);
   }
   const clearBtn = panel.querySelector(".cart-clear");
   if (clearBtn) {
