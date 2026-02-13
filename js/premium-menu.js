@@ -1431,30 +1431,15 @@ function ensureCartPanel() {
 
   const exploreBtn = panel.querySelector(".cart-explore");
   if (exploreBtn) {
-    if (getComputedStyle(exploreBtn).position === "static") {
-      exploreBtn.style.position = "relative";
-    }
-
-    let labelWrapper = exploreBtn.querySelector(".cart-btn-text-wrapper");
-    if (!labelWrapper) {
-      const label = (exploreBtn.textContent || "").trim();
-      exploreBtn.textContent = "";
-      labelWrapper = document.createElement("span");
-      labelWrapper.className = "cart-btn-text-wrapper";
-      labelWrapper.textContent = label;
-      exploreBtn.appendChild(labelWrapper);
-    }
-
-    exploreBtn.style.touchAction = "manipulation";
-    exploreBtn.style.webkitUserSelect = "none";
-    exploreBtn.style.userSelect = "none";
-    exploreBtn.style.webkitTouchCallout = "none";
-
-    Array.from(exploreBtn.children).forEach((child) => {
-      child.style.pointerEvents = "none";
-      child.style.userSelect = "none";
-      child.style.webkitUserSelect = "none";
-      child.style.webkitTouchCallout = "none";
+    exploreBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      seguirExplorando();
+    });
+    exploreBtn.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        seguirExplorando();
+      }
     });
   }
 
@@ -1467,54 +1452,6 @@ function ensureCartPanel() {
     whatsappBtn.addEventListener("click", () => {
       openOrderModal();
     });
-  }
-
-  let exploring = false;
-  const triggerExplore = () => {
-    if (exploring) return;
-    exploring = true;
-    seguirExplorando();
-    setTimeout(() => {
-      exploring = false;
-    }, 300);
-  };
-
-  if (exploreBtn) {
-    let lastTrigger = 0;
-    const tryTriggerExplore = () => {
-      const now = Date.now();
-      if (now - lastTrigger < 100) return;
-      lastTrigger = now;
-      triggerExplore();
-    };
-
-    const handleActivate = (event) => {
-      if (event.type === "keydown") {
-        const key = event.key;
-        if (key !== "Enter" && key !== " ") return;
-      }
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-      event.stopPropagation();
-      tryTriggerExplore();
-    };
-
-    const activationEvents = [
-      "pointerdown",
-      "pointerup",
-      "touchstart",
-      "touchend",
-      "click",
-    ];
-    activationEvents.forEach((type) => {
-      exploreBtn.addEventListener(type, handleActivate, {
-        capture: true,
-        passive: false,
-      });
-    });
-
-    exploreBtn.addEventListener("keydown", handleActivate, true);
   }
 
   const clearBtn = panel.querySelector(".cart-clear");
