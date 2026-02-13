@@ -294,6 +294,9 @@ body.cart-open {
   border-radius: 999px;
   padding: 12px 16px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer !important;
   min-height: 44px;
   min-width: 44px;
@@ -310,7 +313,7 @@ body.cart-open {
 }
 
 .cart-btn * {
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .cart-btn:disabled {
