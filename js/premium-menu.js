@@ -1429,6 +1429,16 @@ function ensureCartPanel() {
   document.body.appendChild(overlay);
   document.body.appendChild(panel);
 
+  const exploreBtn = panel.querySelector(".cart-explore");
+  if (exploreBtn && !exploreBtn.querySelector(".cart-btn-text-wrapper")) {
+    const label = exploreBtn.textContent || "";
+    exploreBtn.textContent = "";
+    const textWrapper = document.createElement("span");
+    textWrapper.className = "cart-btn-text-wrapper";
+    textWrapper.textContent = label.trim();
+    exploreBtn.appendChild(textWrapper);
+  }
+
   overlay.addEventListener("click", closeCart);
   const closeBtn = panel.querySelector(".cart-close");
   if (closeBtn) {
@@ -1476,6 +1486,27 @@ function ensureCartPanel() {
     (event) => {
       if (getExploreButton(event.target)) {
         handleExplore(event);
+      }
+    },
+    true,
+  );
+
+  panel.addEventListener(
+    "contextmenu",
+    (event) => {
+      if (getExploreButton(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    },
+    true,
+  );
+
+  panel.addEventListener(
+    "selectstart",
+    (event) => {
+      if (getExploreButton(event.target)) {
+        event.preventDefault();
       }
     },
     true,

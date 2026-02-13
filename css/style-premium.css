@@ -344,6 +344,14 @@ body.cart-open {
   user-select: none;
 }
 
+.cart-btn-text-wrapper {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  display: block;
+}
+
 .cart-clear {
   background: #f2d6d6;
   color: #8a1f1f;
