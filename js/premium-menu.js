@@ -1431,11 +1431,21 @@ function ensureCartPanel() {
 
   const exploreBtn = panel.querySelector(".cart-explore");
   if (exploreBtn) {
-    exploreBtn.addEventListener("click", (event) => {
-      event.preventDefault();
+    exploreBtn
+      .querySelectorAll("[data-tap-overlay], [data-cart-overlay], div, span")
+      .forEach((node) => node.remove());
+
+    const text = (exploreBtn.textContent || "").trim();
+    exploreBtn.innerHTML = "";
+    exploreBtn.textContent = text;
+
+    const clonedExplore = exploreBtn.cloneNode(true);
+    exploreBtn.parentNode.replaceChild(clonedExplore, exploreBtn);
+
+    clonedExplore.addEventListener("click", () => {
       seguirExplorando();
     });
-    exploreBtn.addEventListener("keydown", (event) => {
+    clonedExplore.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         seguirExplorando();
