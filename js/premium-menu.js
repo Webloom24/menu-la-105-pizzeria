@@ -1430,7 +1430,6 @@ function ensureCartPanel() {
   document.body.appendChild(panel);
 
   const exploreBtn = panel.querySelector(".cart-explore");
-  let tapOverlay = null;
   if (exploreBtn) {
     if (getComputedStyle(exploreBtn).position === "static") {
       exploreBtn.style.position = "relative";
@@ -1446,27 +1445,12 @@ function ensureCartPanel() {
       exploreBtn.appendChild(labelWrapper);
     }
 
-    tapOverlay = exploreBtn.querySelector('[data-tap-overlay="true"]');
-    if (!tapOverlay) {
-      tapOverlay = document.createElement("div");
-      tapOverlay.setAttribute("data-tap-overlay", "true");
-      tapOverlay.setAttribute("aria-hidden", "true");
-      tapOverlay.style.cssText =
-        "position:absolute !important;inset:0 !important;z-index:999999 !important;" +
-        "background:transparent !important;cursor:pointer !important;" +
-        "pointer-events:auto !important;touch-action:none !important;" +
-        "-webkit-user-select:none !important;user-select:none !important;" +
-        "-webkit-touch-callout:none !important;";
-      exploreBtn.appendChild(tapOverlay);
-    }
-
     exploreBtn.style.touchAction = "manipulation";
     exploreBtn.style.webkitUserSelect = "none";
     exploreBtn.style.userSelect = "none";
     exploreBtn.style.webkitTouchCallout = "none";
 
     Array.from(exploreBtn.children).forEach((child) => {
-      if (child === tapOverlay) return;
       child.style.pointerEvents = "none";
       child.style.userSelect = "none";
       child.style.webkitUserSelect = "none";
@@ -1495,84 +1479,51 @@ function ensureCartPanel() {
     }, 300);
   };
 
-  if (tapOverlay) {
-    const trapEvent = (event, run = false) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (run) triggerExplore();
-      return false;
-    };
-
-    tapOverlay.addEventListener("contextmenu", (event) => trapEvent(event), {
-      capture: true,
-      passive: false,
-    });
-    tapOverlay.addEventListener("selectstart", (event) => trapEvent(event), {
-      capture: true,
-      passive: false,
-    });
-    tapOverlay.addEventListener(
-      "touchstart",
-      (event) => trapEvent(event, true),
-      { capture: true, passive: false },
-    );
-    tapOverlay.addEventListener(
-      "pointerdown",
-      (event) => trapEvent(event, true),
-      { capture: true },
-    );
-    tapOverlay.addEventListener(
-      "touchend",
-      (event) => trapEvent(event, false),
-      { capture: true, passive: false },
-    );
-    tapOverlay.addEventListener(
-      "pointerup",
-      (event) => trapEvent(event, false),
-      { capture: true },
-    );
-    tapOverlay.addEventListener("click", (event) => trapEvent(event, true), {
-      capture: true,
-    });
-  }
-
   if (exploreBtn) {
-    const handleButtonTap = (event, run = true) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (run) triggerExplore();
+    let lastTrigger = 0;
+    const runOnce = () => {
+      const now = Date.now();
+      if (now - lastTrigger < 180) return;
+      lastTrigger = now;
+      triggerExplore();
     };
 
-    exploreBtn.addEventListener(
-      "touchstart",
-      (event) => handleButtonTap(event, true),
-      { capture: true, passive: false },
-    );
-    exploreBtn.addEventListener(
-      "pointerdown",
-      (event) => handleButtonTap(event, true),
-      { capture: true },
-    );
-    exploreBtn.addEventListener(
-      "touchend",
-      (event) => handleButtonTap(event, false),
-      { capture: true, passive: false },
-    );
-    exploreBtn.addEventListener(
-      "pointerup",
-      (event) => handleButtonTap(event, false),
-      { capture: true },
-    );
+    const handleButtonTap = (event) => {
+      if (event.type === "pointerup" && event.pointerType === "mouse") {
+        return;
+      }
+      if (event.type !== "click") {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+      runOnce();
+    };
+
+    const pointerSupported = "PointerEvent" in window;
+    if (pointerSupported) {
+      exploreBtn.addEventListener("pointerup", handleButtonTap, {
+        capture: true,
+        passive: false,
+      });
+    } else {
+      exploreBtn.addEventListener("touchend", handleButtonTap, {
+        capture: true,
+        passive: false,
+      });
+    }
+
     exploreBtn.addEventListener(
       "click",
-      (event) => handleButtonTap(event, true),
+      (event) => handleButtonTap(event),
       true,
     );
+
     exploreBtn.addEventListener(
       "keydown",
       (event) => {
         if (event.key === "Enter" || event.key === " ") {
-          handleButtonTap(event, true);
+          event.preventDefault();
+          runOnce();
         }
       },
       true,
