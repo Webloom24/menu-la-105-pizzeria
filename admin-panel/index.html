@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b4332" />
+  <title>Admin – Pizzeria La 105</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style-premium.css" />
+  <link rel="stylesheet" href="css/admin-overlay.css" />
+</head>
+<!-- data-page="inicio" para que el tab Inicio quede activo -->
+<body data-page="inicio" class="page-ready">
+
+  <!-- ══════════════════════════════════════════
+       OVERLAY DE LOGIN (se oculta al autenticar)
+       ══════════════════════════════════════════ -->
+  <div id="login-screen" class="admin-login-overlay">
+    <div class="admin-login-card">
+      <div class="admin-login-icon">🍕</div>
+      <h1 class="admin-login-title">La 105 Pizzería</h1>
+      <p class="admin-login-subtitle">Panel Administrativo</p>
+      <form id="login-form">
+        <label class="order-label" style="text-align:left;margin-bottom:14px;">
+          Correo electrónico
+          <input type="email" id="login-email" class="order-input" placeholder="admin@pizzeria.com" required autocomplete="email" />
+        </label>
+        <label class="order-label" style="text-align:left;margin-bottom:14px;">
+          Contraseña
+          <input type="password" id="login-password" class="order-input" placeholder="••••••••" required autocomplete="current-password" />
+        </label>
+        <button type="submit" class="admin-login-btn">Iniciar Sesión</button>
+        <div id="login-error" class="admin-login-error"></div>
+      </form>
+      <p class="admin-login-footer">Acceso solo para administradores</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       CONTENIDO DE INICIO (clon de index.html raíz)
+       ══════════════════════════════════════════ -->
+  <div id="admin-home" style="display:none;">
+
+    <!-- Header idéntico al público -->
+    <header class="app-header">
+      <img class="app-logo" src="../images/logo.webp" alt="Pizzeria La 105" width="120" height="120" loading="eager" />
+    </header>
+
+    <main class="app-main">
+
+      <!-- Hero foto – idéntico al público -->
+      <section class="hero-photo" aria-label="Pizza del dia">
+        <img src="../images/pizza-inicio.webp" alt="Pizza recien horneada" width="768" height="240" loading="eager" />
+        <span class="hero-kicker">Horno real. Queso al punto.</span>
+        <div class="hero-photo-overlay">
+          <h1>Bienvenido a La 105</h1>
+          <p>Pizza artesanal, horno real y sabor de barrio.</p>
+        </div>
+      </section>
+
+      <!-- Welcome links – apuntan a páginas admin -->
+      <section class="welcome-links">
+        <a class="welcome-card" href="pages/especialidades.html">
+          <span class="card-label">Especialidades</span>
+          <span class="card-subtitle">Ruedas protagonistas</span>
+        </a>
+        <a class="welcome-card" href="pages/tradicionales.html">
+          <span class="card-label">Tradicionales</span>
+          <span class="card-subtitle">Porciones y clasicos</span>
+        </a>
+        <a class="welcome-card" href="pages/panzerottis.html">
+          <span class="card-label">Panzerottis</span>
+          <span class="card-subtitle">Horneado al momento</span>
+        </a>
+        <a class="welcome-card highlight" href="pages/promo.html">
+          <span class="card-label">Promo</span>
+          <span class="card-subtitle">Combo del dia habil</span>
+        </a>
+      </section>
+
+    </main>
+
+    <!-- Tab bar idéntica al público, pero apuntando a páginas admin -->
+    <nav class="tab-bar" aria-label="Navegacion principal">
+      <a class="tab-link" data-page="inicio" href="index.html">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">Inicio</span>
+      </a>
+      <a class="tab-link" data-page="pizzas" href="pages/pizzas.html">
+        <span class="tab-icon">🍕</span>
+        <span class="tab-label">Pizzas</span>
+      </a>
+      <a class="tab-link" data-page="panzerottis" href="pages/panzerottis.html">
+        <span class="tab-icon">🥟</span>
+        <span class="tab-label">Panzerottis</span>
+      </a>
+      <a class="tab-link" data-page="promo" href="pages/promo.html">
+        <span class="tab-icon">⭐</span>
+        <span class="tab-label">Promo</span>
+      </a>
+    </nav>
+
+  </div><!-- /#admin-home -->
+
+  <script type="module">
+    import { supabase, injectAdminBar, injectModals, checkSession, login, updateToggleUI } from './js/admin-core.js'
+
+    const loginScreen = document.getElementById('login-screen')
+    const adminHome   = document.getElementById('admin-home')
+    const loginForm   = document.getElementById('login-form')
+    const loginError  = document.getElementById('login-error')
+
+    // Verificar sesión existente
+    const session = await checkSession()
+    if (session) showHome()
+
+    // Manejar envío de login
+    loginForm.addEventListener('submit', async e => {
+      e.preventDefault()
+      loginError.textContent = ''
+      loginError.classList.remove('visible')
+      const { user, error } = await login(
+        document.getElementById('login-email').value,
+        document.getElementById('login-password').value
+      )
+      if (error) {
+        loginError.textContent = error.message
+        loginError.classList.add('visible')
+        return
+      }
+      showHome()
+    })
+
+    function showHome() {
+      loginScreen.style.display = 'none'
+      adminHome.style.display   = ''
+
+      // Inyectar modales + barra admin
+      injectModals()
+      injectAdminBar('./index.html')
+
+      // Marcar tab activo
+      document.querySelectorAll('.tab-link').forEach(a => {
+        a.classList.toggle('active', a.dataset.page === 'inicio')
+      })
+
+      // Modo edición activo desde el inicio
+      updateToggleUI()
+    }
+  </script>
+
+</body>
+</html>

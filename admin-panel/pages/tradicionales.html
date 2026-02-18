@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b4332" />
+  <title>Admin – Tradicionales · La 105</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../css/style-premium.css" />
+  <link rel="stylesheet" href="../css/admin-overlay.css" />
+</head>
+<body data-page="pizzas" class="page-ready">
+
+  <header class="app-header">
+    <img class="app-logo" src="../../images/logo.webp" alt="Pizzeria La 105" width="120" height="120" loading="eager" />
+  </header>
+
+  <main class="app-main admin-mode" id="app-main">
+
+    <section class="page-title">
+      <h1>
+        <img class="page-title-image"
+          src="../../images/titulos%20ornamentales/ui-titulo-especialidades.svg"
+          alt="Tradicionales" width="280" height="60" loading="eager" />
+      </h1>
+      <p>Porciones clasicas para antojos de diario.</p>
+    </section>
+
+    <section class="section-intro">
+      <h2>Tradicionales</h2>
+      <p>El sabor de siempre, honrando la herencia de nuestra cocina.</p>
+    </section>
+
+    <!-- grid-2 igual que el público para esta sección -->
+    <section class="product-list grid-2" id="product-list"></section>
+
+    <div class="admin-new-cat-block">
+      <button class="admin-add-prod" id="btn-add-prod" style="display:block;">+ Agregar Producto</button>
+    </div>
+
+  </main>
+
+  <nav class="tab-bar" aria-label="Navegacion principal">
+    <a class="tab-link" data-page="inicio"       href="../index.html"><span class="tab-icon">🏠</span><span class="tab-label">Inicio</span></a>
+    <a class="tab-link" data-page="pizzas"        href="pizzas.html"><span class="tab-icon">🍕</span><span class="tab-label">Pizzas</span></a>
+    <a class="tab-link" data-page="panzerottis"   href="panzerottis.html"><span class="tab-icon">🥟</span><span class="tab-label">Panzerottis</span></a>
+    <a class="tab-link" data-page="promo"         href="promo.html"><span class="tab-icon">⭐</span><span class="tab-label">Promo</span></a>
+  </nav>
+
+  <script type="module">
+    import { initPage, openProdModal } from '../js/admin-core.js'
+
+    await initPage({
+      assetBase:  '../../',
+      logoutPath: '../index.html',
+      listId:     'product-list',
+      // El público usa grid-2, pero lo inyectamos desde el HTML directamente
+      filter: cat => {
+        const n = cat.nombre.toLowerCase()
+        return n.includes('clasic') || n.includes('barrio') || n.includes('tradic')
+      }
+    })
+
+    document.getElementById('btn-add-prod')?.addEventListener('click', () => openProdModal(null, null))
+  </script>
+
+</body>
+</html>

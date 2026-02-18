@@ -12,7 +12,83 @@ function resolveAssetPath(src) {
   return `${ASSET_BASE}${src}`;
 }
 
-// Datos del menú embebidos para funcionamiento sin servidor
+// ─────────────────────────────────────────────
+// SUPABASE – carga dinámica del menú
+// ─────────────────────────────────────────────
+const _SB_URL = "https://golgsnrevkjtusououcz.supabase.co";
+const _SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvbGdzbnJldmtqdHVzb3VvdWN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwMTM1NTgsImV4cCI6MjA4NjU4OTU1OH0.0JcvLg6DyPRH-wpcEeGpZ-OtdAvq4FGPm7fbs6Bo3EU";
+
+async function _sbFetch(path) {
+  const res = await fetch(`${_SB_URL}/rest/v1/${path}`, {
+    headers: { apikey: _SB_KEY, Authorization: `Bearer ${_SB_KEY}` },
+  });
+  if (!res.ok) throw new Error(`Supabase ${res.status}`);
+  return res.json();
+}
+
+function _catStringId(nombre) {
+  const n = (nombre || "").toLowerCase();
+  if (n.includes("especial")) return "pizzas-especiales";
+  if (n.includes("clasic") || n.includes("barrio") || n.includes("tradic")) return "pizzas-tradicionales";
+  if (n.includes("pizzeta")) return "pizzetas";
+  if (n.includes("panzerotti")) return "panzerottis";
+  if (n.includes("adicional")) return "adicionales";
+  return n.replace(/\s+/g, "-");
+}
+
+async function loadMenuData() {
+  try {
+    const [cats, prods, cfg] = await Promise.all([
+      _sbFetch("categorias?select=*&order=orden"),
+      _sbFetch("productos?select=*&order=orden"),
+      _sbFetch("configuracion?select=clave,valor"),
+    ]);
+
+    // Configuración del negocio (WhatsApp, nombre)
+    const config = {};
+    cfg.forEach((r) => { config[r.clave] = r.valor; });
+    if (config.whatsapp_numero) MENU_DATA.config.whatsapp = config.whatsapp_numero;
+    if (config.negocio_nombre) MENU_DATA.config.nombreRestaurante = config.negocio_nombre;
+
+    // Mapa UUID → string de categoría
+    const catIdMap = {};
+    cats.forEach((c) => { catIdMap[c.id] = _catStringId(c.nombre); });
+
+    // Categorías
+    MENU_DATA.categorias = cats
+      .filter((c) => c.activa)
+      .map((c) => ({
+        id: _catStringId(c.nombre),
+        nombre: c.nombre,
+        emoji: c.icono || "🍕",
+        icono: "",
+        subtitulo: c.descripcion || "",
+        orden: c.orden || 0,
+        visible: true,
+      }));
+
+    // Productos (id numérico secuencial para seeds de imagen)
+    let seq = 0;
+    MENU_DATA.productos = prods
+      .filter((p) => p.disponible)
+      .map((p) => ({
+        id: ++seq,
+        nombre: p.nombre,
+        descripcion: p.descripcion || "",
+        precio: Number(p.precio),
+        categoria: catIdMap[p.categoria_id] || "adicionales",
+        badge: p.destacado ? "recomendado" : null,
+        orden: p.orden || 0,
+        visible: true,
+        imagen: p.imagen_url || null,
+      }));
+  } catch (err) {
+    // Si Supabase no responde, el menú usa los datos locales como respaldo
+    console.warn("Menú: usando datos locales (Supabase no disponible):", err.message);
+  }
+}
+
+// Datos del menú – respaldo local (se reemplaza con datos de Supabase al cargar)
 const MENU_DATA = {
   config: {
     nombreRestaurante: "Pizzería La 105",
@@ -546,11 +622,20 @@ const PROMO_HOLIDAYS_2026 = new Set([
   "2026-12-25",
 ]);
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   document.body.classList.add("page-ready");
   ensureAddonsModal();
   ensureCartPanel();
   ensureOrderModal();
+
+  // Mostrar "Cargando..." mientras se obtienen los datos de Supabase
+  const list = document.querySelector("[data-category],[data-categories]");
+  if (list) {
+    list.innerHTML = '<p style="text-align:center;padding:40px;color:var(--muted,#888);">Cargando menú...</p>';
+  }
+
+  await loadMenuData();
+
   preloadMenuConfig();
   if (shouldClearCartOnLoad()) {
     sessionStorage.removeItem(CART_KEY);
@@ -583,7 +668,6 @@ document.addEventListener("DOMContentLoaded", () => {
     link.addEventListener("click", handleTransition);
   });
 
-  const list = document.querySelector("[data-category],[data-categories]");
   if (list) {
     renderCategoria(list.dataset.category || "", list);
   }

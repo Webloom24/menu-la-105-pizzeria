@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b4332" />
+  <title>Admin – Promo · La 105</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500;1,700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../css/style-premium.css" />
+  <link rel="stylesheet" href="../css/admin-overlay.css" />
+</head>
+<body data-page="promo" class="page-ready">
+
+  <header class="app-header">
+    <img class="app-logo" src="../../images/logo.webp" alt="Pizzeria La 105" width="120" height="120" loading="eager" />
+  </header>
+
+  <main class="app-main" id="app-main">
+
+    <section class="page-title">
+      <h1>Promo de la semana</h1>
+      <p>Disponible de lunes a viernes.</p>
+    </section>
+
+    <!-- Hero promo idéntico al público -->
+    <section class="promo-hero">
+      <div class="promo-hero-media">
+        <img src="../../images/imagen-promo.webp"
+          alt="Pizzeta con queso y gaseosa para la promo"
+          width="920" height="690" loading="eager" />
+        <span class="promo-hero-badge">Combo irresistible</span>
+      </div>
+      <div class="promo-hero-copy">
+        <h2>Queso derretido + gaseosa fria</h2>
+        <p>Una promo pensada para compartir sin afan.</p>
+      </div>
+    </section>
+
+    <!-- Promo card idéntica al público + overlay de edición admin -->
+    <section class="promo-card" style="position:relative;" id="promo-card">
+      <h2 id="promo-titulo">Combo Pizzeta + Gaseosa Litro</h2>
+      <p id="promo-descripcion">Lunes a viernes por $30.000 (precio regular $34.000).</p>
+      <div class="promo-price" id="promo-precio">$30.000</div>
+      <button class="card-action promo-action" type="button" aria-label="Pedir">Pedir</button>
+
+      <!-- Overlay de edición (solo visible en modo admin) -->
+      <div class="card-admin-overlay" id="promo-admin-overlay">
+        <button class="admin-fab admin-fab-edit" id="btn-edit-promo" title="Editar promo">✏️</button>
+      </div>
+    </section>
+
+    <!-- Modal de edición de la promo (solo admin) -->
+    <div id="modal-promo" class="addons-modal">
+      <div class="addons-panel" style="width:min(480px,100%);">
+        <div class="addons-header">
+          <h3>✏️ Editar Promo</h3>
+          <button class="addons-close" id="close-promo-modal">×</button>
+        </div>
+        <div class="addons-body">
+          <label class="order-label">Título del combo<input type="text" id="promo-input-titulo" class="order-input" value="Combo Pizzeta + Gaseosa Litro" /></label>
+          <label class="order-label">Descripción<input type="text" id="promo-input-desc" class="order-input" value="Lunes a viernes por $30.000 (precio regular $34.000)." /></label>
+          <label class="order-label">Precio<input type="text" id="promo-input-precio" class="order-input" value="$30.000" /></label>
+          <label class="order-label">Badge (ej: "Combo irresistible")<input type="text" id="promo-input-badge" class="order-input" value="Combo irresistible" /></label>
+          <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+            💡 Estos cambios se reflejan visualmente en el panel admin. Para actualizar el sitio público edita también el archivo <code>js/premium-menu.js</code>.
+          </p>
+        </div>
+        <div class="addons-footer" style="display:flex;gap:10px;justify-content:flex-end;">
+          <button class="order-cancel order-btn" id="close-promo-modal2">Cancelar</button>
+          <button class="order-send order-btn" id="btn-save-promo">💾 Actualizar vista</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <nav class="tab-bar" aria-label="Navegacion principal">
+    <a class="tab-link" data-page="inicio"       href="../index.html"><span class="tab-icon">🏠</span><span class="tab-label">Inicio</span></a>
+    <a class="tab-link" data-page="pizzas"        href="pizzas.html"><span class="tab-icon">🍕</span><span class="tab-label">Pizzas</span></a>
+    <a class="tab-link" data-page="panzerottis"   href="panzerottis.html"><span class="tab-icon">🥟</span><span class="tab-label">Panzerottis</span></a>
+    <a class="tab-link" data-page="promo"         href="promo.html"><span class="tab-icon">⭐</span><span class="tab-label">Promo</span></a>
+  </nav>
+
+  <script type="module">
+    import { initPage } from '../js/admin-core.js'
+
+    // Inicializar sin lista de productos (promo es estática)
+    await initPage({
+      assetBase:  '../../',
+      logoutPath: '../index.html',
+      listId:     null,
+      filter:     null
+    })
+
+    // Mostrar overlay de edición en la promo card
+    const promoCard    = document.getElementById('promo-card')
+    const promoOverlay = document.getElementById('promo-admin-overlay')
+    const modal        = document.getElementById('modal-promo')
+
+    // Hover / touch activa overlay en promo card
+    promoCard?.addEventListener('mouseenter', () => promoOverlay?.style.setProperty('opacity', '1'))
+    promoCard?.addEventListener('mouseleave', () => promoOverlay?.style.setProperty('opacity', '0'))
+
+    // Botón editar promo abre modal
+    document.getElementById('btn-edit-promo')?.addEventListener('click', () => {
+      modal?.classList.add('active')
+    })
+
+    // Cerrar modal
+    document.getElementById('close-promo-modal')?.addEventListener('click',  () => modal?.classList.remove('active'))
+    document.getElementById('close-promo-modal2')?.addEventListener('click', () => modal?.classList.remove('active'))
+
+    // Guardar cambios visuales de la promo
+    document.getElementById('btn-save-promo')?.addEventListener('click', () => {
+      document.getElementById('promo-titulo').textContent      = document.getElementById('promo-input-titulo').value
+      document.getElementById('promo-descripcion').textContent = document.getElementById('promo-input-desc').value
+      document.getElementById('promo-precio').textContent      = document.getElementById('promo-input-precio').value
+      document.querySelector('.promo-hero-badge').textContent  = document.getElementById('promo-input-badge').value
+      modal?.classList.remove('active')
+    })
+  </script>
+
+</body>
+</html>
